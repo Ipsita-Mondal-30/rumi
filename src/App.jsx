@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { SignupScreen } from './components/onboarding/Signup.jsx';
 import { SignInScreen } from './components/onboarding/SignInScreen.jsx';
 import { OTPScreen } from './components/onboarding/OTPScreen.jsx';
+import { ProfileSetup } from './components/profile/ProfileSetup.jsx';
+import * as userApi from './api/userApi.js';
 
 const FontStyles = () => (
   <style>{`
@@ -18,17 +20,36 @@ export default function App() {
     <div className="w-full font-sans selection:bg-blue-200">
       <FontStyles />
       {view === 'signup' && (
-        <SignupScreen onNext={() => setView('otp')} onLogin={() => setView('signin')} />
+        <SignupScreen
+          onNext={async (email) => {
+            try {
+              const res = await userApi.register(email);
+              if (res.user?._id) {
+                localStorage.setItem('rumi_user_id', res.user._id);
+                setView('profile');
+              } else setView('otp');
+            } catch {
+              setView('otp');
+            }
+          }}
+          onLogin={() => setView('signin')}
+        />
       )}
       {view === 'signin' && (
         <SignInScreen
-          onLoginSuccess={() => {}}
+          onLoginSuccess={() => setView('profile')}
           onForgotPassword={() => setView('otp')}
           onSignup={() => setView('signup')}
         />
       )}
       {view === 'otp' && (
-        <OTPScreen onVerify={() => {}} onBack={() => setView('signin')} />
+        <OTPScreen onVerify={() => setView('profile')} onBack={() => setView('signin')} />
+      )}
+      {view === 'profile' && (
+        <ProfileSetup
+          onComplete={() => setView('signin')}
+          onBack={() => setView('signin')}
+        />
       )}
     </div>
   );

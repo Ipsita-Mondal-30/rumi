@@ -24,11 +24,12 @@ const AppleIcon = () => (
 export const SignupScreen = ({ onNext, onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [email, setEmail] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (agreed) {
-      onNext();
+    if (agreed && email.trim()) {
+      onNext(email.trim());
     }
   };
 
@@ -66,6 +67,8 @@ export const SignupScreen = ({ onNext, onLogin }) => {
               <input 
                 type="text" 
                 placeholder="Enter your email or phone"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:border-[#4E668A] focus:ring-4 focus:ring-[#4E668A]/10 transition-all outline-none text-slate-900 placeholder:text-slate-400"
                 required
               />
