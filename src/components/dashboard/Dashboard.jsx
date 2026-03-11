@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as userApi from '../../api/userApi.js';
+import './dashboard-theme.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -29,6 +30,7 @@ export function Dashboard({ onLogout, onEditProfile }) {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [swipeExitDirection, setSwipeExitDirection] = useState('right');
 
   const [swipeCards, setSwipeCards] = useState([
     {
@@ -110,6 +112,7 @@ export function Dashboard({ onLogout, onEditProfile }) {
   }, []);
 
   const handleSwipe = (direction) => {
+    setSwipeExitDirection(direction);
     setSwipeCards((prev) => prev.slice(1));
   };
 
@@ -124,14 +127,31 @@ export function Dashboard({ onLogout, onEditProfile }) {
     : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80';
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div
+      className="rumi-dashboard min-h-screen flex"
+      style={{
+        backgroundColor: 'var(--rumi-muted, #ececf0)',
+        color: 'var(--rumi-foreground, #030213)',
+      }}
+    >
       {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-sm flex flex-col">
+      <aside
+        className="w-64 flex flex-col shadow-sm"
+        style={{
+          backgroundColor: 'var(--rumi-sidebar, #fafafa)',
+          borderRight: '1px solid var(--rumi-sidebar-border, #eee)',
+        }}
+      >
         <div className="p-6 flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Home size={18} className="text-white" />
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: 'var(--rumi-sidebar-primary, #030213)' }}
+          >
+            <Home size={18} style={{ color: 'var(--rumi-sidebar-primary-foreground)' }} />
           </div>
-          <span className="text-xl font-semibold text-gray-900">Rumi</span>
+          <span className="text-xl font-semibold" style={{ color: 'var(--rumi-sidebar-foreground)' }}>
+            Rumi
+          </span>
         </div>
 
         <nav className="flex-1 px-4 py-2">
@@ -139,9 +159,29 @@ export function Dashboard({ onLogout, onEditProfile }) {
             <button
               key={nav}
               onClick={() => setActiveNav(nav)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-colors ${
-                activeNav === nav ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-colors"
+              style={
+                activeNav === nav
+                  ? {
+                      backgroundColor: 'var(--rumi-sidebar-primary, #030213)',
+                      color: 'var(--rumi-sidebar-primary-foreground)',
+                    }
+                  : {
+                      color: 'var(--rumi-sidebar-foreground)',
+                    }
+              }
+              onMouseEnter={(e) => {
+                if (activeNav !== nav) {
+                  e.currentTarget.style.backgroundColor = 'var(--rumi-sidebar-accent, #f5f5f5)';
+                  e.currentTarget.style.color = 'var(--rumi-sidebar-accent-foreground)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeNav !== nav) {
+                  e.currentTarget.style.backgroundColor = '';
+                  e.currentTarget.style.color = 'var(--rumi-sidebar-foreground)';
+                }
+              }}
             >
               {nav === 'dashboard' && <Home size={20} />}
               {nav === 'discover' && <Search size={20} />}
@@ -155,7 +195,13 @@ export function Dashboard({ onLogout, onEditProfile }) {
           ))}
         </nav>
 
-        <div className="mx-4 mb-4 p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl text-white">
+        <div
+          className="mx-4 mb-4 p-4 rounded-2xl"
+          style={{
+            background: 'linear-gradient(135deg, #4E668A 0%, #081A35 100%)',
+            color: '#fff',
+          }}
+        >
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={16} />
             <span className="text-sm font-semibold">AI in action</span>
@@ -167,7 +213,14 @@ export function Dashboard({ onLogout, onEditProfile }) {
 
         <button
           onClick={onLogout}
-          className="mx-4 mb-6 flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors"
+          className="mx-4 mb-6 flex items-center gap-3 px-4 py-3 rounded-xl transition-colors"
+          style={{ color: 'var(--rumi-sidebar-foreground)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--rumi-sidebar-accent)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '';
+          }}
         >
           <LogOut size={20} />
           <span>Logout</span>
@@ -176,23 +229,42 @@ export function Dashboard({ onLogout, onEditProfile }) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <header className="bg-white shadow-sm px-8 py-4 sticky top-0 z-10">
+        <header
+          className="shadow-sm px-8 py-4 sticky top-0 z-10"
+          style={{
+            backgroundColor: 'var(--rumi-card, #fff)',
+            borderBottom: '1px solid var(--rumi-border)',
+          }}
+        >
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+            <h1 className="text-2xl font-semibold" style={{ color: 'var(--rumi-foreground)' }}>
+              Dashboard
+            </h1>
 
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--rumi-muted-foreground)' }}
+                />
                 <input
                   type="text"
                   placeholder="Search matches, locations, preferences"
-                  className="pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
+                  className="pl-10 pr-4 py-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 w-80"
+                  style={{
+                    backgroundColor: 'var(--rumi-input-background)',
+                    color: 'var(--rumi-foreground)',
+                  }}
                 />
               </div>
 
-              <button className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors relative">
+              <button
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-colors relative"
+                style={{ backgroundColor: 'var(--rumi-accent)', color: 'var(--rumi-foreground)' }}
+              >
                 <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--rumi-destructive)' }} />
               </button>
 
               <button className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-100">
@@ -207,9 +279,17 @@ export function Dashboard({ onLogout, onEditProfile }) {
 
           {/* My profile summary from saved data */}
           {profile && (
-            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Your profile</h3>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+            <div
+              className="mt-4 p-4 rounded-xl"
+              style={{
+                backgroundColor: 'var(--rumi-muted)',
+                border: '1px solid var(--rumi-border)',
+              }}
+            >
+              <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--rumi-foreground)' }}>
+                Your profile
+              </h3>
+              <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--rumi-muted-foreground)' }}>
                 {profile.bio && <span className="max-w-md truncate">{profile.bio}</span>}
                 {profile.age && <span>Age {profile.age}</span>}
                 {profile.gender && <span className="capitalize">{profile.gender.replace('_', ' ')}</span>}
@@ -232,60 +312,85 @@ export function Dashboard({ onLogout, onEditProfile }) {
         <div className="p-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-3xl p-8 shadow-sm">
+              <div
+                className="rounded-3xl p-8 shadow-sm"
+                style={{
+                  backgroundColor: 'var(--rumi-card)',
+                  boxShadow: '0 1px 3px var(--rumi-border)',
+                }}
+              >
                 <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-1">Discover Matches</h2>
-                  <p className="text-gray-500">Swipe right to connect, left to pass.</p>
+                  <h2 className="text-2xl font-semibold mb-1" style={{ color: 'var(--rumi-foreground)' }}>
+                    Discover Matches
+                  </h2>
+                  <p style={{ color: 'var(--rumi-muted-foreground)' }}>Swipe right to connect, left to pass.</p>
                 </div>
 
-                <div className="relative h-[600px] flex items-center justify-center">
-                  <AnimatePresence>
+                <div className="flex flex-col gap-6">
+                  <div className="relative h-[520px] min-h-[360px] flex items-center justify-center overflow-hidden rounded-2xl">
+                    <AnimatePresence initial={false}>
                     {swipeCards.length > 0 ? (
                       swipeCards.map(
                         (card, index) =>
                           index < 3 && (
                             <motion.div
                               key={card.id}
-                              className="absolute w-full max-w-md"
-                              style={{ zIndex: swipeCards.length - index }}
-                              initial={
-                                index === 0
-                                  ? { scale: 1, y: 0, opacity: 1 }
-                                  : { scale: 0.95 - index * 0.05, y: index * 10, opacity: 1 - index * 0.3 }
-                              }
-                              animate={{
-                                scale: 1 - index * 0.05,
-                                y: index * 10,
-                                opacity: 1 - index * 0.3,
+                              className="absolute left-1/2 top-4 w-full max-w-md max-h-[calc(100%-2rem)] cursor-grab active:cursor-grabbing"
+                              style={{
+                                zIndex: swipeCards.length - index,
+                                transformOrigin: 'center center',
                               }}
-                              exit={{ x: 1000, opacity: 0, rotate: 45 }}
-                              transition={{ duration: 0.3 }}
+                              initial={{
+                                x: '-50%',
+                                scale: 1 - index * 0.06,
+                                y: index * 36,
+                                opacity: index === 0 ? 1 : 0.95 - index * 0.25,
+                              }}
+                              animate={{
+                                x: '-50%',
+                                scale: 1 - index * 0.06,
+                                y: index * 36,
+                                opacity: index === 0 ? 1 : 0.95 - index * 0.25,
+                              }}
+                              exit={{
+                                x: swipeExitDirection === 'left' ? -520 : 520,
+                                opacity: 0,
+                                rotate: swipeExitDirection === 'left' ? -15 : 15,
+                                transition: { duration: 0.3, ease: 'easeInOut' },
+                              }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                             >
-                              <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-                                <div className="relative h-80">
+                              <div
+                                className="rounded-3xl shadow-xl overflow-hidden bg-white h-full max-h-[480px] flex flex-col"
+                                style={{
+                                  backgroundColor: 'var(--rumi-card, #ffffff)',
+                                  border: '1px solid var(--rumi-border, rgba(0,0,0,0.1))',
+                                }}
+                              >
+                                <div className="relative h-52 flex-shrink-0">
                                   <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
-                                  <div className="absolute top-4 right-4 bg-emerald-500 text-white px-4 py-2 rounded-full font-semibold text-sm shadow-lg">
+                                  <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1.5 rounded-full font-semibold text-xs shadow-lg">
                                     {card.match}% Match
                                   </div>
                                 </div>
-                                <div className="p-6">
-                                  <h3 className="text-2xl font-semibold text-gray-900 mb-1">
+                                <div className="p-4 flex-1 min-h-0 flex flex-col overflow-hidden">
+                                  <h3 className="text-xl font-semibold mb-0.5 truncate" style={{ color: 'var(--rumi-foreground)' }}>
                                     {card.name}, {card.age}
                                   </h3>
-                                  <p className="text-gray-600 mb-4 leading-relaxed">{card.bio}</p>
-                                  <div className="flex flex-wrap gap-2 mb-4">
+                                  <p className="text-sm mb-2 leading-snug line-clamp-2 flex-shrink-0" style={{ color: 'var(--rumi-muted-foreground)' }}>{card.bio}</p>
+                                  <div className="flex flex-wrap gap-1.5 mb-2 flex-shrink-0">
                                     {card.tags.map((tag, i) => (
                                       <span
                                         key={i}
-                                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium"
+                                        className="px-2.5 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium"
                                       >
                                         {tag}
                                       </span>
                                     ))}
                                   </div>
-                                  <div className="flex items-center gap-2 text-gray-700">
-                                    <DollarSign size={20} className="text-blue-600" />
-                                    <span className="font-semibold">Budget: ₹{card.budget}/month</span>
+                                  <div className="flex items-center gap-1.5 mt-auto flex-shrink-0" style={{ color: 'var(--rumi-foreground)' }}>
+                                    <DollarSign size={16} style={{ color: 'var(--rumi-primary)' }} />
+                                    <span className="font-semibold text-sm">Budget: ₹{card.budget}/month</span>
                                   </div>
                                 </div>
                               </div>
@@ -293,38 +398,53 @@ export function Dashboard({ onLogout, onEditProfile }) {
                           )
                       )
                     ) : (
-                      <div className="text-center text-gray-400">
+                      <div className="text-center" style={{ color: 'var(--rumi-muted-foreground)' }}>
                         <Users size={64} className="mx-auto mb-4 opacity-50" />
                         <p className="text-lg">No more profiles to show</p>
                         <p className="text-sm">Check back later for new matches!</p>
                       </div>
                     )}
                   </AnimatePresence>
-                </div>
-
-                {swipeCards.length > 0 && (
-                  <div className="flex items-center justify-center gap-6 mt-8">
-                    <button
-                      onClick={() => handleSwipe('left')}
-                      className="w-16 h-16 bg-red-50 hover:bg-red-100 rounded-full flex items-center justify-center text-red-500 transition-all hover:scale-110 shadow-md"
-                    >
-                      <X size={32} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      onClick={() => handleSwipe('right')}
-                      className="w-16 h-16 bg-emerald-50 hover:bg-emerald-100 rounded-full flex items-center justify-center text-emerald-500 transition-all hover:scale-110 shadow-md"
-                    >
-                      <Heart size={32} strokeWidth={2.5} />
-                    </button>
                   </div>
-                )}
+
+                  {swipeCards.length > 0 && (
+                    <div
+                      className="flex items-center justify-center gap-6 py-4 relative z-20"
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <motion.button
+                        type="button"
+                        onClick={() => handleSwipe('left')}
+                        className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 text-red-500 touch-manipulation"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                      >
+                        <X size={32} strokeWidth={2.5} />
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        onClick={() => handleSwipe('right')}
+                        className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-500 touch-manipulation"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                      >
+                        <Heart size={32} strokeWidth={2.5} />
+                      </motion.button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="space-y-6">
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Heart size={20} className="text-blue-600" />
+              <div
+                className="rounded-2xl p-6 shadow-sm"
+                style={{ backgroundColor: 'var(--rumi-card)', border: '1px solid var(--rumi-border)' }}
+              >
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--rumi-foreground)' }}>
+                  <Heart size={20} style={{ color: 'var(--rumi-primary)' }} />
                   Requests Received
                 </h3>
                 <div className="space-y-4">
@@ -337,17 +457,23 @@ export function Dashboard({ onLogout, onEditProfile }) {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm">
+                          <p className="font-semibold text-sm" style={{ color: 'var(--rumi-foreground)' }}>
                             {request.name}, {request.age}
                           </p>
-                          <p className="text-xs text-emerald-600 font-medium">{request.match}% Match</p>
+                          <p className="text-xs font-medium text-emerald-600">{request.match}% Match</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                        <button
+                          className="flex-1 px-3 py-2 text-white rounded-lg text-sm font-medium transition-colors"
+                          style={{ backgroundColor: 'var(--rumi-primary)' }}
+                        >
                           Accept
                         </button>
-                        <button className="flex-1 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                        <button
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                          style={{ backgroundColor: 'var(--rumi-accent)', color: 'var(--rumi-foreground)' }}
+                        >
                           Reject
                         </button>
                       </div>
@@ -356,9 +482,12 @@ export function Dashboard({ onLogout, onEditProfile }) {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Send size={20} className="text-blue-600" />
+              <div
+                className="rounded-2xl p-6 shadow-sm"
+                style={{ backgroundColor: 'var(--rumi-card)', border: '1px solid var(--rumi-border)' }}
+              >
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--rumi-foreground)' }}>
+                  <Send size={20} style={{ color: 'var(--rumi-primary)' }} />
                   Sent Requests
                 </h3>
                 <div className="space-y-3">
@@ -370,10 +499,10 @@ export function Dashboard({ onLogout, onEditProfile }) {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm truncate">
+                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--rumi-foreground)' }}>
                           {request.name}, {request.age}
                         </p>
-                        <p className="text-xs text-gray-500">{request.match}% Match</p>
+                        <p className="text-xs" style={{ color: 'var(--rumi-muted-foreground)' }}>{request.match}% Match</p>
                       </div>
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -394,9 +523,12 @@ export function Dashboard({ onLogout, onEditProfile }) {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users size={20} className="text-blue-600" />
+              <div
+                className="rounded-2xl p-6 shadow-sm"
+                style={{ backgroundColor: 'var(--rumi-card)', border: '1px solid var(--rumi-border)' }}
+              >
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--rumi-foreground)' }}>
+                  <Users size={20} style={{ color: 'var(--rumi-primary)' }} />
                   Active Matches
                 </h3>
                 <div className="space-y-3">
@@ -408,10 +540,13 @@ export function Dashboard({ onLogout, onEditProfile }) {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{match.name}</p>
+                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--rumi-foreground)' }}>{match.name}</p>
                         <p className="text-xs text-emerald-600 font-medium">{match.match}% Match</p>
                       </div>
-                      <button className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white hover:bg-blue-700 transition-colors">
+                      <button
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors"
+                        style={{ backgroundColor: 'var(--rumi-primary)' }}
+                      >
                         <MessageCircle size={16} />
                       </button>
                     </div>
@@ -419,8 +554,11 @@ export function Dashboard({ onLogout, onEditProfile }) {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+              <div
+                className="rounded-2xl p-6 shadow-sm"
+                style={{ backgroundColor: 'var(--rumi-card)', border: '1px solid var(--rumi-border)' }}
+              >
+                <h3 className="font-semibold mb-4" style={{ color: 'var(--rumi-foreground)' }}>Quick Actions</h3>
                 <div className="space-y-2">
                   {quickActions.map((action, index) => {
                     const Icon = action.icon;
@@ -429,7 +567,8 @@ export function Dashboard({ onLogout, onEditProfile }) {
                         key={index}
                         type="button"
                         onClick={action.onClick}
-                        className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors"
+                        style={{ backgroundColor: 'var(--rumi-accent)' }}
                       >
                         <div
                           className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -442,16 +581,19 @@ export function Dashboard({ onLogout, onEditProfile }) {
                         >
                           <Icon size={20} />
                         </div>
-                        <span className="text-sm font-medium text-gray-700">{action.label}</span>
+                        <span className="text-sm font-medium" style={{ color: 'var(--rumi-foreground)' }}>{action.label}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Target size={20} className="text-blue-600" />
+              <div
+                className="rounded-2xl p-6 shadow-sm"
+                style={{ backgroundColor: 'var(--rumi-card)', border: '1px solid var(--rumi-border)' }}
+              >
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--rumi-foreground)' }}>
+                  <Target size={20} style={{ color: 'var(--rumi-primary)' }} />
                   Compatibility Insights
                 </h3>
                 <div className="space-y-4">
@@ -471,18 +613,18 @@ export function Dashboard({ onLogout, onEditProfile }) {
                           strokeLinecap="round"
                         />
                       </svg>
-                      <span className="absolute text-2xl font-bold text-gray-900">89%</span>
+                      <span className="absolute text-2xl font-bold" style={{ color: 'var(--rumi-foreground)' }}>89%</span>
                     </div>
-                    <p className="text-sm text-gray-600">Average Match Score</p>
+                    <p className="text-sm" style={{ color: 'var(--rumi-muted-foreground)' }}>Average Match Score</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="text-center p-3 bg-blue-50 rounded-xl">
                       <p className="text-2xl font-bold text-blue-600">24</p>
-                      <p className="text-xs text-gray-600">Nearby Matches</p>
+                      <p className="text-xs" style={{ color: 'var(--rumi-muted-foreground)' }}>Nearby Matches</p>
                     </div>
                     <div className="text-center p-3 bg-emerald-50 rounded-xl">
                       <p className="text-2xl font-bold text-emerald-600">91%</p>
-                      <p className="text-xs text-gray-600">Lifestyle Match</p>
+                      <p className="text-xs" style={{ color: 'var(--rumi-muted-foreground)' }}>Lifestyle Match</p>
                     </div>
                   </div>
                 </div>
