@@ -10,12 +10,11 @@ export function Dashboard() {
   const [matches, setMatches] = useState([...DEMO_DISCOVER]);
   const [received, setReceived] = useState([...DEMO_RECEIVED]);
   const [sent, setSent] = useState([...DEMO_SENT]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [useDemoData, setUseDemoData] = useState(true);
 
   const load = () => {
-    setLoading(true);
     Promise.all([
       getMatches().then((r) => (r.data?.success ? r.data.matches : [])),
       getReceivedRequests().then((r) => (r.data?.success ? r.data.requests : [])),
