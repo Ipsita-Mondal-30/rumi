@@ -1,66 +1,44 @@
-import React, { useState } from "react";
-import { SignupScreen } from './components/onboarding/Signup.jsx';
-import { SignInScreen } from './components/onboarding/SignInScreen.jsx';
-import { OTPScreen } from './components/onboarding/OTPScreen.jsx';
-import { ProfileSetup } from './components/profile/ProfileSetup.jsx';
-import { Dashboard } from './components/dashboard/Dashboard.jsx';
-import * as userApi from './api/userApi.js';
-
-const FontStyles = () => (
-  <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-      body { font-family: 'Poppins', sans-serif; }
-      .phone-shadow { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 12px #1a1a1a; }
-    `}</style>
-);
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+import { MainLayout } from './components/MainLayout.jsx';
+import { Login } from './pages/Login.jsx';
+import { Signup } from './pages/Signup.jsx';
+import { Dashboard } from './pages/Dashboard.jsx';
+import { Discover } from './pages/Discover.jsx';
+import { Matches } from './pages/Matches.jsx';
+import { Messages } from './pages/Messages.jsx';
+import { Profile } from './pages/Profile.jsx';
+import { Settings } from './pages/Settings.jsx';
+import { Activity } from './pages/Activity.jsx';
 
 export default function App() {
-  const [view, setView] = useState('signin');
-
   return (
-    <div className="w-full font-sans selection:bg-blue-200">
-      <FontStyles />
-      {view === 'signup' && (
-        <SignupScreen
-          onNext={async (email) => {
-            try {
-              const res = await userApi.register(email);
-              if (res.user?._id) {
-                localStorage.setItem('rumi_user_id', res.user._id);
-                setView('profile');
-              } else setView('otp');
-            } catch {
-              setView('otp');
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
             }
-          }}
-          onLogin={() => setView('signin')}
-        />
-      )}
-      {view === 'signin' && (
-        <SignInScreen
-          onLoginSuccess={() => setView('dashboard')}
-          onForgotPassword={() => setView('otp')}
-          onSignup={() => setView('signup')}
-        />
-      )}
-      {view === 'otp' && (
-        <OTPScreen onVerify={() => setView('dashboard')} onBack={() => setView('signin')} />
-      )}
-      {view === 'profile' && (
-        <ProfileSetup
-          onComplete={() => setView('dashboard')}
-          onBack={() => setView('signin')}
-        />
-      )}
-      {view === 'dashboard' && (
-        <Dashboard
-          onLogout={() => {
-            localStorage.removeItem('rumi_user_id');
-            setView('signin');
-          }}
-          onEditProfile={() => setView('profile')}
-        />
-      )}
-    </div>
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="discover" element={<Discover />} />
+            <Route path="matches" element={<Matches />} />
+            <Route path="messages" element={<Messages />} />
+            <Route path="activity" element={<Activity />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

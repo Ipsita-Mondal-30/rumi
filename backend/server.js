@@ -1,10 +1,19 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
 import express from 'express';
+import { Server as SocketServer } from 'socket.io';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
+import { registerChatHandlers } from './socket/chatHandler.js';
+
+import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import matchRoutes from './routes/matchRoutes.js';
+import requestRoutes from './routes/requestRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -16,10 +25,15 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// API routes
+app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
+app.use('/matches', matchRoutes);
+app.use('/request', requestRoutes);
+app.use('/chat', chatRoutes);
+app.use('/report', reportRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
@@ -28,4 +42,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: err.message || 'Server error.' });
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+const server = http.createServer(app);
+const io = new SocketServer(server, {
+  cors: { origin: true },
+  path: '/socket.io',
+});
+registerChatHandlers(io);
+
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

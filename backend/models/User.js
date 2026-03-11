@@ -74,7 +74,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.index({ email: 1 });
 userSchema.index({ city: 1 });
 userSchema.index({ 'lifestylePreferences.foodPreference': 1 });
 userSchema.index({ trustScore: -1 });

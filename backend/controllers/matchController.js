@@ -22,14 +22,15 @@ export async function getMatches(req, res) {
       profileCompleted: true,
     }).select('-passwordHash -otpCode -otpExpiresAt');
 
-    const acceptedOrPendingWith = await Request.find({
+    const acceptedOrPending = await Request.find({
       $or: [{ fromUserId: userId }, { toUserId: userId }],
       status: { $in: ['accepted', 'pending'] },
-    }).distinct('fromUserId').then(ids => {
-      const set = new Set(ids.map(id => id.toString()));
-      set.add(userId.toString());
-      return set;
-    });
+    }).select('fromUserId toUserId').lean();
+    const acceptedOrPendingWith = new Set([userId.toString()]);
+    for (const r of acceptedOrPending) {
+      acceptedOrPendingWith.add(r.fromUserId?.toString());
+      acceptedOrPendingWith.add(r.toUserId?.toString());
+    }
 
     const candidates = allOthers.filter(
       (u) => !acceptedOrPendingWith.has(u._id.toString())
