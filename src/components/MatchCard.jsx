@@ -2,7 +2,7 @@ import React from 'react';
 import { Tag } from './Tag.jsx';
 import { DollarSign, X, Heart } from 'lucide-react';
 
-export function MatchCard({ profile, matchScore = 0, reasons = [], onConnect, onSkip, loading }) {
+export function MatchCard({ profile, matchScore = 0, reasons = [], onConnect, onSkip, onReport, loading }) {
   const photo = profile?.photo || profile?.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop';
   const name = profile?.name || 'Unknown';
   const age = profile?.age ?? '';
@@ -47,9 +47,16 @@ export function MatchCard({ profile, matchScore = 0, reasons = [], onConnect, on
             ))}
           </div>
         )}
-        <div className="flex items-center gap-1.5 mt-2 text-slate-700">
-          <DollarSign size={16} className="text-slate-600 flex-shrink-0" />
-          <span className="font-medium text-sm">Budget: {budget}/month</span>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <DollarSign size={16} className="text-slate-600 flex-shrink-0" />
+            <span className="font-medium text-sm">Budget: {budget}/month</span>
+          </div>
+          {onReport && profile?._id && (
+            <button type="button" onClick={() => onReport(profile)} className="text-xs text-slate-500 hover:text-red-600 hover:underline">
+              Report
+            </button>
+          )}
         </div>
       </div>
       <div className="p-4 border-t border-slate-100 space-y-3">

@@ -41,16 +41,16 @@ export function Matches() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-4xl mx-auto w-full bg-[#F7F8FC]">
-      <h1 className="text-2xl font-semibold text-slate-900 mb-6">My Matches</h1>
+    <div className="flex-1 p-8 max-w-4xl mx-auto w-full">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">My Matches</h1>
 
       <div className="space-y-6">
-        <section className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Requests Received</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Requests Received</h2>
           {loading ? (
-            <p className="text-slate-500">Loading…</p>
+            <p className="text-gray-500">Loading…</p>
           ) : received.length === 0 ? (
-            <p className="text-slate-500 text-sm">No requests received yet</p>
+            <p className="text-gray-500 text-sm">No requests received yet</p>
           ) : (
             <div className="space-y-3">
               {received.map((req) => (
@@ -65,24 +65,24 @@ export function Matches() {
           )}
         </section>
 
-        <section className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Sent Requests</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Sent Requests</h2>
           {sent.length === 0 ? (
-            <p className="text-slate-500 text-sm">No requests sent yet</p>
+            <p className="text-gray-500 text-sm">No requests sent yet</p>
           ) : (
             <div className="space-y-2">
               {sent.map((req) => (
-                <div key={req._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div key={req._id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
                   <div className="flex items-center gap-3">
                     <img
                       src={req.toUserId?.photo || req.toUserId?.profilePicture || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop'}
                       alt=""
                       className="w-12 h-12 rounded-full object-cover"
                     />
-                    <span className="font-medium text-slate-900">{req.toUserId?.name || 'User'}</span>
+                    <span className="font-medium text-gray-900">{req.toUserId?.name || 'User'}</span>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    req.status === 'accepted' ? 'bg-blue-50 text-[#2F80ED]' : 'bg-slate-100 text-slate-600'
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    req.status === 'accepted' ? 'bg-emerald-50 text-emerald-600' : req.status === 'pending' ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {req.status}
                   </span>
@@ -92,25 +92,25 @@ export function Matches() {
           )}
         </section>
 
-        <section className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Active Matches</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Active Matches</h2>
           {activeMatches.length === 0 ? (
-            <p className="text-slate-500 text-sm">No matches yet. Connect with someone from Discover!</p>
+            <p className="text-gray-500 text-sm">No matches yet. Connect with someone from Discover!</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {activeMatches.map((u) => (
                 <Link
                   key={u._id}
-                  to={`/messages?userId=${u._id}`}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors"
+                  to={`/dashboard/messages?userId=${u._id}`}
+                  className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <img
                     src={u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop'}
                     alt=""
                     className="w-12 h-12 rounded-full object-cover"
                   />
-                  <span className="font-medium text-slate-900 flex-1 truncate">{u.name || 'User'}</span>
-                  <div className="w-10 h-10 rounded-full bg-[#2F80ED] text-white flex items-center justify-center flex-shrink-0">
+                  <span className="font-medium text-gray-900 flex-1 truncate">{u.name || 'User'}</span>
+                  <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
                     <MessageCircle size={20} />
                   </div>
                 </Link>

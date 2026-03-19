@@ -36,6 +36,13 @@ export const verifyOtp = (email, code) => api.post('/auth/otp/verify', { email, 
 // User
 export const getProfile = () => api.get('/user/profile');
 export const updateProfile = (data) => api.put('/user/profile', data);
+export const uploadProfilePhoto = (file) => {
+  const form = new FormData();
+  form.append('photo', file);
+  return api.post('/user/profile/photo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
 
 // Matches
 export const getMatches = (params) => api.get('/matches', { params });
@@ -43,6 +50,7 @@ export const getMatchExplain = (userId) => api.get('/matches/explain', { params:
 
 // Requests
 export const sendRequest = (toUserId) => api.post('/request/send', { toUserId });
+export const passRequest = (toUserId) => api.post('/request/pass', { toUserId });
 export const acceptRequest = (data) => api.post('/request/accept', data);
 export const rejectRequest = (data) => api.post('/request/reject', data);
 export const getReceivedRequests = () => api.get('/request/received');

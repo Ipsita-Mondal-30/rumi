@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MatchCard } from '../components/MatchCard.jsx';
 import { FilterPanel } from '../components/FilterPanel.jsx';
-import { getMatches, sendRequest } from '../services/api.js';
+import { getMatches, sendRequest, passRequest } from '../services/api.js';
 import { DEMO_DISCOVER } from '../data/mockData.js';
 import { SlidersHorizontal } from 'lucide-react';
 
@@ -50,6 +50,15 @@ export function Discover() {
       .finally(() => setSending(false));
   };
   const handleSkip = () => setMatches((prev) => prev.slice(1));
+  const handleSkipApi = () => {
+    if (useDemoData) return handleSkip();
+    const current = matches[0];
+    if (!current?.user?._id) return;
+    setSending(true);
+    passRequest(current.user._id)
+      .finally(() => setSending(false))
+      .then(fetchMatches);
+  };
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-6 p-6 max-w-7xl mx-auto w-full bg-[#F7F8FC]">
@@ -75,7 +84,7 @@ export function Discover() {
             matchScore={current.matchScore}
             reasons={current.reasons}
             onConnect={handleConnect}
-            onSkip={handleSkip}
+            onSkip={handleSkipApi}
             loading={sending}
           />
         ) : (

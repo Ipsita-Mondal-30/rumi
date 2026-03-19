@@ -33,25 +33,25 @@ export function Profile() {
 
   if (loading) {
     return (
-      <div className="flex-1 p-6 flex items-center justify-center bg-[#F7F8FC]">
-        <p className="text-slate-500">Loading profile…</p>
+      <div className="flex-1 p-6 flex items-center justify-center">
+        <p className="text-gray-500">Loading profile…</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 p-6 max-w-2xl mx-auto w-full bg-[#F7F8FC]">
+    <div className="flex-1 p-8 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Profile</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Profile</h1>
         <Link
-          to="/settings"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 shadow-sm"
+          to="/dashboard/settings"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 shadow-sm"
         >
           <Edit size={18} />
           Edit
         </Link>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="h-48 bg-gradient-to-br from-blue-50 to-slate-100" />
         <div className="px-6 pb-6 -mt-16 relative">
           <div className="flex items-end gap-4">

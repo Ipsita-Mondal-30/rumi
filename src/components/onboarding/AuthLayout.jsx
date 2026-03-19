@@ -2,10 +2,9 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { User, ChevronLeft } from 'lucide-react';
 
-export const AuthLayout = ({ children, title, subtitle, onBack }) => {
+export function AuthLayout({ children, title, subtitle, onBack }) {
   return (
     <div className="min-h-screen w-full bg-white flex justify-center items-center">
-      {/* Form Area in the center*/}
       <div className="w-full max-w-2xl p-6 md:p-12 flex flex-col items-center relative">
         <div className="absolute top-8 left-8 md:left-12 flex items-center gap-2">
           <div className="bg-slate-900 p-1.5 rounded-lg">
@@ -15,7 +14,8 @@ export const AuthLayout = ({ children, title, subtitle, onBack }) => {
         </div>
 
         {onBack && (
-          <button 
+          <button
+            type="button"
             onClick={onBack}
             className="absolute top-8 right-8 text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1"
           >
@@ -49,4 +49,4 @@ export const AuthLayout = ({ children, title, subtitle, onBack }) => {
       </div>
     </div>
   );
-};
+}

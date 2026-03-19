@@ -61,7 +61,11 @@ export const OTPScreen = ({ onVerify, onBack, email = "user@example.com", title 
     >
       <div className="mb-8 p-3 bg-blue-50/50 rounded-lg flex items-center justify-between border border-blue-100">
         <span className="text-sm text-slate-600 font-medium">{email}</span>
-        <button className="text-xs text-[#4E668A] font-bold hover:underline flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onBack?.()}
+          className="text-xs text-[#4E668A] font-bold hover:underline flex items-center gap-1"
+        >
           <Edit2 size={12} /> Change
         </button>
       </div>

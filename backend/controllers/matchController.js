@@ -24,7 +24,7 @@ export async function getMatches(req, res) {
 
     const acceptedOrPending = await Request.find({
       $or: [{ fromUserId: userId }, { toUserId: userId }],
-      status: { $in: ['accepted', 'pending'] },
+      status: { $in: ['accepted', 'pending', 'rejected'] },
     }).select('fromUserId toUserId').lean();
     const acceptedOrPendingWith = new Set([userId.toString()]);
     for (const r of acceptedOrPending) {
@@ -38,15 +38,24 @@ export async function getMatches(req, res) {
 
     const results = candidates.map((other) => {
       const { matchScore, reasons } = calculateMatch(user, other);
+      const u = other.toObject();
+      const budgetRange = u.budgetRange || {};
+      const budgetStr = [budgetRange.min, budgetRange.max].every((n) => n != null && n > 0)
+        ? `${budgetRange.min}-${budgetRange.max}`
+        : null;
       return {
-        user: other.toObject(),
+        user: u,
         matchScore,
+        compatibility: matchScore,
         reasons,
+        name: u.name,
+        city: u.city || u.location?.city || '',
+        budget: budgetStr,
       };
     });
 
     results.sort((a, b) => b.matchScore - a.matchScore);
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 20);
     const list = results.slice(0, limit);
 
     return res.json({

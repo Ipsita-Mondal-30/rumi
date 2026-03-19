@@ -48,7 +48,7 @@ export function Settings() {
       });
       await refreshUser();
       setMessage('Profile updated.');
-      navigate('/profile', { replace: true });
+      navigate('/dashboard/profile', { replace: true });
     } catch (err) {
       setMessage(err.response?.data?.message || 'Update failed');
     } finally {
@@ -57,9 +57,9 @@ export function Settings() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-2xl mx-auto w-full bg-[#F7F8FC]">
-      <h1 className="text-2xl font-semibold text-slate-900 mb-6">Settings</h1>
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+    <div className="flex-1 p-8 max-w-2xl mx-auto w-full">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Settings</h1>
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-2xl p-6 shadow-sm">
         {message && (
           <p className={`text-sm ${message.includes('failed') ? 'text-red-600' : 'text-emerald-600'}`}>{message}</p>
         )}
@@ -138,7 +138,7 @@ export function Settings() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full py-3 rounded-xl font-semibold text-white bg-[#2F80ED] hover:bg-blue-700 disabled:opacity-50"
+          className="w-full py-3 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save changes'}
         </button>

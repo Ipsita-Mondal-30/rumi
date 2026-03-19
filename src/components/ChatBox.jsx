@@ -6,8 +6,8 @@ const API_BASE = import.meta.env.VITE_API_URL
   ? (import.meta.env.VITE_API_URL.startsWith('http') ? import.meta.env.VITE_API_URL : `${typeof window !== 'undefined' ? window.location.origin : ''}${import.meta.env.VITE_API_URL}`)
   : 'http://localhost:4000';
 
-export function ChatBox({ otherUser, currentUserId, socket }) {
-  const [messages, setMessages] = useState([]);
+export function ChatBox({ otherUser, currentUserId, socket, seedMessages, onReport }) {
+  const [messages, setMessages] = useState(Array.isArray(seedMessages) ? seedMessages : []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef(null);
@@ -19,13 +19,18 @@ export function ChatBox({ otherUser, currentUserId, socket }) {
     setLoading(true);
     getChatHistory(otherId)
       .then((res) => {
-        if (res.data?.success && Array.isArray(res.data.messages)) {
-          setMessages(res.data.messages);
+        if (res.data?.success && Array.isArray(res.data.messages) && res.data.messages.length > 0) {
+          setMessages(res.data.messages.map((m) => ({ ...m, isOwn: m.senderId === currentUserId })));
+        } else if (Array.isArray(seedMessages) && seedMessages.length > 0) {
+          setMessages(seedMessages);
         }
       })
-      .catch(() => setMessages([]))
+      .catch(() => {
+        if (Array.isArray(seedMessages) && seedMessages.length > 0) setMessages(seedMessages);
+        else setMessages([]);
+      })
       .finally(() => setLoading(false));
-  }, [otherId]);
+  }, [otherId, currentUserId, seedMessages]);
 
   useEffect(() => {
     if (!socket) return;
@@ -64,13 +69,20 @@ export function ChatBox({ otherUser, currentUserId, socket }) {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-100 overflow-hidden">
-      <div className="p-3 border-b border-slate-100 flex items-center gap-3">
-        <img
-          src={photo || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop'}
-          alt=""
-          className="w-10 h-10 rounded-full object-cover"
-        />
-        <span className="font-semibold text-slate-900">{name}</span>
+      <div className="p-3 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={photo || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop'}
+            alt=""
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+          />
+          <span className="font-semibold text-slate-900 truncate">{name}</span>
+        </div>
+        {onReport && (
+          <button type="button" onClick={() => onReport(otherUser)} className="text-xs text-slate-500 hover:text-red-600 hover:underline flex-shrink-0">
+            Report
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
         {loading ? (

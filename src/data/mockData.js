@@ -296,4 +296,30 @@ const DEMO_ACTIVE_MATCHES = [
   },
 ];
 
-export { DEMO_DISCOVER, DEMO_RECEIVED, DEMO_SENT, DEMO_ACTIVE_MATCHES };
+// Seed conversations for Messages page (same as active matches for demo)
+const DEMO_CONVERSATIONS = [
+  { _id: 'mock-to-2', name: 'James Parker', age: 27, photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop' },
+  { _id: 'mock-active-2', name: 'Maya Chen', age: 25, photo: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&h=100&fit=crop' },
+  { _id: 'mock-active-3', name: 'Alex Rodriguez', age: 29, photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop' },
+];
+
+// Seed messages per conversation (keyed by other user _id). currentUserId is the logged-in user.
+const DEMO_MESSAGES_BY_OTHER = {
+  'mock-to-2': [
+    { _id: 'dm1', message: 'Hey! Saw we matched. When are you looking to move?', timestamp: new Date(Date.now() - 86400000).toISOString(), isOwn: false },
+    { _id: 'dm2', message: 'Hi James! Probably next month. What area are you in?', timestamp: new Date(Date.now() - 86000000).toISOString(), isOwn: true },
+    { _id: 'dm3', message: 'Koramangala. I have a 2BHK with one room available.', timestamp: new Date(Date.now() - 85000000).toISOString(), isOwn: false },
+    { _id: 'dm4', message: 'That works. Can we schedule a visit this weekend?', timestamp: new Date(Date.now() - 84000000).toISOString(), isOwn: true },
+  ],
+  'mock-active-2': [
+    { _id: 'dm5', message: 'Hi Maya! Love your profile.', timestamp: new Date(Date.now() - 3600000).toISOString(), isOwn: true },
+    { _id: 'dm6', message: 'Thanks! Same here. Are you okay with plants? I have quite a few.', timestamp: new Date(Date.now() - 3500000).toISOString(), isOwn: false },
+    { _id: 'dm7', message: 'Yes, no problem. I like a green space.', timestamp: new Date(Date.now() - 3400000).toISOString(), isOwn: true },
+  ],
+  'mock-active-3': [
+    { _id: 'dm8', message: 'Hey Alex, still looking for a flatmate?', timestamp: new Date(Date.now() - 7200000).toISOString(), isOwn: true },
+    { _id: 'dm9', message: 'Yes! Prefer someone who keeps the gym time early.', timestamp: new Date(Date.now() - 7100000).toISOString(), isOwn: false },
+  ],
+};
+
+export { DEMO_DISCOVER, DEMO_RECEIVED, DEMO_SENT, DEMO_ACTIVE_MATCHES, DEMO_CONVERSATIONS, DEMO_MESSAGES_BY_OTHER };

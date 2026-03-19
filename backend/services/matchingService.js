@@ -1,117 +1,100 @@
 /**
- * Compatibility matching algorithm for Rumi flatmate matching.
- * Calculates match percentage and reasons based on lifestyle preferences.
+ * Rumi compatibility scoring (0–100).
+ * Factor points: same city +25, budget overlap +20, cleanliness ≤1 +15,
+ * sleep match +10, food +10, smoking +10, working status +10. Max = 100.
  */
 
-const WEIGHTS = {
-  budget: 25,
-  foodPreference: 15,
-  sleepSchedule: 15,
-  smoking: 15,
-  cleanlinessLevel: 12,
-  guestPolicy: 10,
-  drinking: 5,
-  pets: 3,
+const POINTS = {
+  sameCity: 25,
+  budgetOverlap: 20,
+  cleanlinessSimilar: 15,
+  sleepSchedule: 10,
+  foodPreference: 10,
+  smoking: 10,
+  workingStatus: 10,
 };
+const MAX_SCORE = 100;
 
-/**
- * Normalize budget overlap: score 0–100 based on how much ranges overlap.
- */
-function budgetScore(a, b) {
+/** Cleanliness order for "difference ≤ 1" (low=0, medium=1, high=2). */
+const CLEAN_ORDER = { low: 0, medium: 1, high: 2, '': -1 };
+
+function budgetOverlap(a, b) {
   const aMin = a?.min ?? 0;
   const aMax = a?.max ?? 0;
   const bMin = b?.min ?? 0;
   const bMax = b?.max ?? 0;
-  if (aMax < bMin || bMax < aMin) return { score: 0, reason: null };
-  const overlapMin = Math.max(aMin, bMin);
-  const overlapMax = Math.min(aMax, bMax);
-  const overlap = Math.max(0, overlapMax - overlapMin);
-  const totalSpan = Math.max(aMax - aMin, bMax - bMin, 1);
-  const score = Math.round((overlap / totalSpan) * 100);
-  return { score, reason: score >= 50 ? 'same or similar budget range' : null };
+  if (aMax < bMin || bMax < aMin) return false;
+  return true;
+}
+
+function cleanlinessDifference(levelA, levelB) {
+  const va = CLEAN_ORDER[levelA] ?? -1;
+  const vb = CLEAN_ORDER[levelB] ?? -1;
+  if (va < 0 || vb < 0) return 999;
+  return Math.abs(va - vb);
 }
 
 /**
- * Exact match for categorical fields.
- */
-function categoricalScore(a, b, reasonSame) {
-  const va = (a || '').toString().toLowerCase();
-  const vb = (b || '').toString().toLowerCase();
-  if (!va || !vb) return { score: 50, reason: null };
-  const match = va === vb;
-  return {
-    score: match ? 100 : 0,
-    reason: match ? reasonSame : null,
-  };
-}
-
-/**
- * Calculate overall match score and list of reasons between two users.
- * @param {Object} userA - User document (with lifestylePreferences, budgetRange)
+ * Calculate compatibility score (0–100) and reasons.
+ * @param {Object} userA - User document (city, budgetRange, lifestylePreferences, profession)
  * @param {Object} userB - User document
  * @returns {{ matchScore: number, reasons: string[] }}
  */
 export function calculateMatch(userA, userB) {
+  let score = 0;
   const reasons = [];
-  let totalWeight = 0;
-  let weightedSum = 0;
+
+  const cityA = (userA.city || userA.location?.city || '').toString().trim().toLowerCase();
+  const cityB = (userB.city || userB.location?.city || '').toString().trim().toLowerCase();
+  if (cityA && cityB && cityA === cityB) {
+    score += POINTS.sameCity;
+    reasons.push('Same city');
+  }
+
+  if (budgetOverlap(userA.budgetRange, userB.budgetRange)) {
+    score += POINTS.budgetOverlap;
+    reasons.push('Budget overlap');
+  }
 
   const prefsA = userA.lifestylePreferences || {};
   const prefsB = userB.lifestylePreferences || {};
-  const budgetA = userA.budgetRange || {};
-  const budgetB = userB.budgetRange || {};
+  const cleanDiff = cleanlinessDifference(prefsA.cleanlinessLevel, prefsB.cleanlinessLevel);
+  if (cleanDiff <= 1 && cleanDiff < 999) {
+    score += POINTS.cleanlinessSimilar;
+    reasons.push('Similar cleanliness');
+  }
 
-  // Budget
-  const b = budgetScore(budgetA, budgetB);
-  weightedSum += (b.score / 100) * WEIGHTS.budget;
-  totalWeight += WEIGHTS.budget;
-  if (b.reason) reasons.push(b.reason);
+  const sleepA = (prefsA.sleepSchedule || '').toString().toLowerCase();
+  const sleepB = (prefsB.sleepSchedule || '').toString().toLowerCase();
+  if (sleepA && sleepB && sleepA === sleepB) {
+    score += POINTS.sleepSchedule;
+    reasons.push('Similar sleep schedule');
+  }
 
-  // Food preference
-  const food = categoricalScore(prefsA.foodPreference, prefsB.foodPreference, 'same food preference');
-  weightedSum += (food.score / 100) * WEIGHTS.foodPreference;
-  totalWeight += WEIGHTS.foodPreference;
-  if (food.reason) reasons.push(food.reason);
+  const foodA = (prefsA.foodPreference || '').toString().toLowerCase();
+  const foodB = (prefsB.foodPreference || '').toString().toLowerCase();
+  if (foodA && foodB && foodA === foodB) {
+    score += POINTS.foodPreference;
+    reasons.push('Same food preference');
+  }
 
-  // Sleep schedule
-  const sleep = categoricalScore(prefsA.sleepSchedule, prefsB.sleepSchedule, 'similar sleep schedule');
-  weightedSum += (sleep.score / 100) * WEIGHTS.sleepSchedule;
-  totalWeight += WEIGHTS.sleepSchedule;
-  if (sleep.reason) reasons.push(sleep.reason);
+  const smokeA = (prefsA.smoking || '').toString().toLowerCase();
+  const smokeB = (prefsB.smoking || '').toString().toLowerCase();
+  if (smokeA && smokeB && smokeA === smokeB) {
+    score += POINTS.smoking;
+    reasons.push('Smoking preference match');
+  }
 
-  // Smoking
-  const smoking = categoricalScore(prefsA.smoking, prefsB.smoking, 'both non-smokers');
-  weightedSum += (smoking.score / 100) * WEIGHTS.smoking;
-  totalWeight += WEIGHTS.smoking;
-  if (smoking.reason) reasons.push(smoking.reason);
+  const workA = (userA.profession || '').toString().toLowerCase();
+  const workB = (userB.profession || '').toString().toLowerCase();
+  if (workA && workB && workA === workB) {
+    score += POINTS.workingStatus;
+    reasons.push('Similar working status');
+  }
 
-  // Cleanliness
-  const clean = categoricalScore(prefsA.cleanlinessLevel, prefsB.cleanlinessLevel, 'similar cleanliness level');
-  weightedSum += (clean.score / 100) * WEIGHTS.cleanlinessLevel;
-  totalWeight += WEIGHTS.cleanlinessLevel;
-  if (clean.reason) reasons.push(clean.reason);
-
-  // Guest policy
-  const guest = categoricalScore(prefsA.guestPolicy, prefsB.guestPolicy, 'compatible guest policy');
-  weightedSum += (guest.score / 100) * WEIGHTS.guestPolicy;
-  totalWeight += WEIGHTS.guestPolicy;
-  if (guest.reason) reasons.push(guest.reason);
-
-  // Drinking
-  const drink = categoricalScore(prefsA.drinking, prefsB.drinking, 'compatible drinking preference');
-  weightedSum += (drink.score / 100) * WEIGHTS.drinking;
-  totalWeight += WEIGHTS.drinking;
-  if (drink.reason) reasons.push(drink.reason);
-
-  // Pets
-  const pets = categoricalScore(prefsA.pets, prefsB.pets, 'compatible pet preference');
-  weightedSum += (pets.score / 100) * WEIGHTS.pets;
-  totalWeight += WEIGHTS.pets;
-  if (pets.reason) reasons.push(pets.reason);
-
-  const matchScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight)) : 0;
+  const compatibility = Math.min(MAX_SCORE, score);
   return {
-    matchScore: Math.min(100, matchScore),
+    matchScore: compatibility,
     reasons,
   };
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MatchCard } from '../components/MatchCard.jsx';
+import { SwipeCardStack } from '../components/SwipeCardStack.jsx';
 import { RequestCard } from '../components/RequestCard.jsx';
-import { getMatches, getReceivedRequests, getSentRequests, sendRequest, acceptRequest, rejectRequest } from '../services/api.js';
+import { ReportModal } from '../components/ReportModal.jsx';
+import { getMatches, getReceivedRequests, getSentRequests, sendRequest, acceptRequest, rejectRequest, passRequest } from '../services/api.js';
 import { DEMO_DISCOVER, DEMO_RECEIVED, DEMO_SENT, DEMO_ACTIVE_MATCHES } from '../data/mockData.js';
 import { Link } from 'react-router-dom';
 import { Heart, Send, Users, MessageCircle, Edit, User, Target } from 'lucide-react';
@@ -13,6 +14,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [useDemoData, setUseDemoData] = useState(true);
+  const [reportUser, setReportUser] = useState(null);
 
   const load = () => {
     Promise.all([
@@ -21,14 +23,16 @@ export function Dashboard() {
       getSentRequests().then((r) => (r.data?.success ? r.data.requests : [])),
     ])
       .then(([m, rec, s]) => {
-        const hasApiData = m.length > 0 || rec.length > 0 || s.length > 0;
-        if (hasApiData) {
+        if (m.length > 0) {
           setUseDemoData(false);
           setMatches(m);
+        }
+        if (rec.length > 0 || s.length > 0) {
+          setUseDemoData(false);
           setReceived(rec);
           setSent(s);
         }
-        // else keep existing demo data
+        // else keep existing demo data for any section that came back empty
       })
       .catch(() => {
         setUseDemoData(true);
@@ -44,19 +48,31 @@ export function Dashboard() {
   }, []);
 
   const current = matches[0];
-  const handleConnect = () => {
-    if (!current?.user?._id) return;
+  const handleConnectItem = (item) => {
+    if (!item?.user?._id) return;
     if (useDemoData) {
-      setSending(true);
-      setMatches((prev) => prev.slice(1));
-      setSent((prev) => [...prev, { _id: `sent-${Date.now()}`, status: 'pending', matchScore: current.matchScore, toUserId: current.user }]);
-      setSending(false);
+      setMatches((prev) => {
+        const next = prev.filter((m) => (m.user?._id ?? m._id) !== (item.user?._id ?? item._id));
+        return next.length === 0 ? [...DEMO_DISCOVER] : next;
+      });
+      setSent((prev) => [...prev, { _id: `sent-${Date.now()}`, status: 'pending', matchScore: item.matchScore, toUserId: item.user }]);
       return;
     }
     setSending(true);
-    sendRequest(current.user._id).then(load).finally(() => setSending(false));
+    sendRequest(item.user._id).then(load).finally(() => setSending(false));
   };
-  const handleSkip = () => setMatches((prev) => prev.slice(1));
+  const handleSkipItem = (item) => {
+    if (!item?.user?._id) return;
+    if (useDemoData) {
+      setMatches((prev) => {
+        const next = prev.filter((m) => (m.user?._id ?? m._id) !== (item.user?._id ?? item._id));
+        return next.length === 0 && useDemoData ? [...DEMO_DISCOVER] : next;
+      });
+      return;
+    }
+    setSending(true);
+    passRequest(item.user._id).then(load).finally(() => setSending(false));
+  };
   const handleAccept = (req) => {
     if (useDemoData) {
       setReceived((prev) => prev.filter((r) => r._id !== req._id));
@@ -87,46 +103,50 @@ export function Dashboard() {
   const lifestyleMatch = current?.matchScore ?? 91;
 
   return (
-    <div className="flex-1 p-6 w-full min-w-0">
-      <div className="grid grid-cols-12 gap-6 w-full max-w-[1600px] mx-auto">
-        {/* Discover Matches (main card) - 8 columns */}
-        <div className="col-span-12 lg:col-span-8 flex flex-col items-start min-w-0">
-          <div className="w-full mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-1">Discover Matches</h2>
-            <p className="text-slate-500 text-sm">Swipe right to connect, left to pass.</p>
-          </div>
-          {loading ? (
-            <div className="w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-md animate-pulse h-96 flex items-center justify-center">
-              <p className="text-slate-500">Loading…</p>
+    <>
+    {reportUser && (
+      <ReportModal
+        reportedUserId={reportUser._id}
+        reportedUserName={reportUser.name}
+        onClose={() => setReportUser(null)}
+      />
+    )}
+    <div className="flex-1 p-8 w-full min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-[1600px] mx-auto">
+        {/* Discover Matches (main card) - 2/3 width */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-3xl p-8 shadow-sm">
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-1">Discover Matches</h2>
+              <p className="text-gray-500">Swipe right to connect, left to pass.</p>
             </div>
-          ) : current ? (
-            <div className="w-full max-w-lg">
-              <MatchCard
-                profile={current.user}
-                matchScore={current.matchScore}
-                reasons={current.reasons}
-                onConnect={handleConnect}
-                onSkip={handleSkip}
+          {loading ? (
+            <div className="relative h-[520px] flex items-center justify-center rounded-2xl bg-gray-50 animate-pulse">
+              <p className="text-gray-500">Loading…</p>
+            </div>
+          ) : (
+            <div className="w-full max-w-lg relative h-[520px]">
+              <SwipeCardStack
+                matchItems={matches}
+                onSwipeLeft={handleSkipItem}
+                onSwipeRight={handleConnectItem}
                 loading={sending}
               />
             </div>
-          ) : (
-            <div className="w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-md p-12 text-center">
-              <p className="text-slate-500">No more profiles. Try filters or check back later.</p>
-            </div>
           )}
+          </div>
         </div>
 
-        {/* Right widgets - 4 columns */}
-        <div className="col-span-12 lg:col-span-4 space-y-6 min-w-0">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-md">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Heart size={20} className="text-slate-500" />
+        {/* Right widgets */}
+        <div className="space-y-6 min-w-0">
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Heart size={20} className="text-blue-600" />
             Requests Received
           </h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {received.length === 0 ? (
-              <p className="text-sm text-slate-500">No requests yet</p>
+              <p className="text-sm text-gray-500">No requests yet</p>
             ) : (
               received.map((req) => (
                 <RequestCard
@@ -141,14 +161,14 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-md">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Send size={20} className="text-slate-500" />
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Send size={20} className="text-blue-600" />
             Sent Requests
           </h3>
           <div className="space-y-3 max-h-44 overflow-y-auto">
             {sent.length === 0 ? (
-              <p className="text-sm text-slate-500">No requests sent yet</p>
+              <p className="text-sm text-gray-500">No requests sent yet</p>
             ) : (
               sent.map((req) => (
                 <div key={req._id} className="flex items-center gap-3 py-1">
@@ -161,8 +181,8 @@ export function Dashboard() {
                     <p className="text-sm font-semibold text-slate-900 truncate">{req.toUserId?.name || 'User'}</p>
                     <p className="text-xs text-slate-500">{req.matchScore ?? req.toUserId?.match ?? '—'}% Match</p>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1 ${
-                    req.status === 'accepted' ? 'bg-blue-50 text-[#2F80ED]' : 'bg-slate-100 text-slate-600'
+                  <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 font-medium ${
+                    req.status === 'accepted' ? 'bg-emerald-50 text-emerald-600' : req.status === 'pending' ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {req.status === 'accepted' && <span>✓</span>}
                     {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
@@ -173,29 +193,29 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-md">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Users size={20} className="text-slate-500" />
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Users size={20} className="text-blue-600" />
             Active Matches
           </h3>
           <div className="space-y-3">
             {activeMatches.length === 0 ? (
-              <p className="text-sm text-slate-500">No matches yet</p>
+              <p className="text-sm text-gray-500">No matches yet</p>
             ) : (
               activeMatches.map((u) => (
-                <div key={u._id} className="flex items-center gap-3 py-2">
+                <div key={u._id} className="flex items-center gap-3">
                   <img
                     src={u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop'}
                     alt=""
                     className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{u.name || 'User'}</p>
-                    <p className="text-xs text-[#2F80ED] font-medium">{u.match ?? '—'}% Match</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{u.name || 'User'}</p>
+                    <p className="text-xs text-emerald-600 font-medium">{u.match ?? '—'}% Match</p>
                   </div>
                   <Link
-                    to={`/messages?userId=${u._id}`}
-                    className="p-2 rounded-lg bg-[#2F80ED] text-white hover:bg-blue-700 flex-shrink-0"
+                    to={`/dashboard/messages?userId=${u._id}`}
+                    className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white hover:bg-blue-700 transition-colors flex-shrink-0"
                   >
                     <MessageCircle size={16} />
                   </Link>
@@ -205,23 +225,23 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-md">
-          <h3 className="font-semibold text-slate-900 mb-4">Quick Actions</h3>
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="space-y-2">
-            <Link to="/messages" className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium text-slate-700 border border-blue-100">
-              <div className="w-10 h-10 rounded-lg bg-[#2F80ED] text-white flex items-center justify-center">
+            <Link to="/dashboard/messages" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700">
+              <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center">
                 <MessageCircle size={20} />
               </div>
               View Messages
             </Link>
-            <Link to="/settings" className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium text-slate-700 border border-blue-100">
-              <div className="w-10 h-10 rounded-lg bg-[#2F80ED] text-white flex items-center justify-center">
+            <Link to="/dashboard/settings" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700">
+              <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center">
                 <Edit size={20} />
               </div>
               Edit Preferences
             </Link>
-            <Link to="/profile" className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium text-slate-700 border border-blue-100">
-              <div className="w-10 h-10 rounded-lg bg-[#2F80ED] text-white flex items-center justify-center">
+            <Link to="/dashboard/profile" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700">
+              <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center">
                 <User size={20} />
               </div>
               Complete Profile
@@ -229,32 +249,33 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-md">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Target size={20} className="text-[#2F80ED]" />
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Target size={20} className="text-blue-600" />
             Compatibility Insights
           </h3>
           <div className="flex flex-col items-center mb-4">
-            <div className="relative w-24 h-24 rounded-full flex items-center justify-center" style={{ background: `conic-gradient(#2F80ED ${avgScore * 3.6}deg, #E2E8F0 0deg)` }}>
+            <div className="relative w-24 h-24 rounded-full flex items-center justify-center" style={{ background: `conic-gradient(#2563eb ${avgScore * 3.6}deg, #E5E7EB 0deg)` }}>
               <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
-                <span className="text-xl font-bold text-slate-900">{avgScore}%</span>
+                <span className="text-xl font-bold text-gray-900">{avgScore}%</span>
               </div>
             </div>
-            <p className="text-sm text-slate-500 mt-2">Average Match Score</p>
+            <p className="text-sm text-gray-500 mt-2">Average Match Score</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-blue-50 p-3 text-center">
-              <p className="text-2xl font-bold text-[#2F80ED]">{nearbyCount}</p>
-              <p className="text-xs text-[#2F80ED] font-medium">Nearby Matches</p>
+              <p className="text-2xl font-bold text-blue-600">{nearbyCount}</p>
+              <p className="text-xs text-blue-600 font-medium">Nearby Matches</p>
             </div>
             <div className="rounded-xl bg-blue-50 p-3 text-center">
-              <p className="text-2xl font-bold text-[#2F80ED]">{lifestyleMatch}%</p>
-              <p className="text-xs text-[#2F80ED] font-medium">Lifestyle Match</p>
+              <p className="text-2xl font-bold text-blue-600">{lifestyleMatch}%</p>
+              <p className="text-xs text-blue-600 font-medium">Lifestyle Match</p>
             </div>
           </div>
         </div>
         </div>
       </div>
     </div>
+    </>
   );
 }

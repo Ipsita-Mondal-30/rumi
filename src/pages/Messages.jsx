@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChatBox } from '../components/ChatBox.jsx';
 import { getReceivedRequests, getSentRequests } from '../services/api.js';
+import { DEMO_CONVERSATIONS, DEMO_MESSAGES_BY_OTHER } from '../data/mockData.js';
+import { ReportModal } from '../components/ReportModal.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { io } from 'socket.io-client';
 
@@ -12,9 +14,10 @@ const SOCKET_URL = import.meta.env.VITE_API_URL
 export function Messages() {
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get('userId');
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState([...DEMO_CONVERSATIONS]);
   const [selected, setSelected] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [reportUser, setReportUser] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -25,7 +28,8 @@ export function Messages() {
       const byId = new Map();
       rec.filter((r) => r.status === 'accepted').forEach((r) => r.fromUserId?._id && byId.set(r.fromUserId._id.toString(), r.fromUserId));
       sent.filter((r) => r.status === 'accepted').forEach((r) => r.toUserId?._id && byId.set(r.toUserId._id.toString(), r.toUserId));
-      setConversations(Array.from(byId.values()));
+      const list = Array.from(byId.values());
+      if (list.length > 0) setConversations(list);
     });
   }, []);
 
@@ -37,6 +41,7 @@ export function Messages() {
       setSelected(conversations[0]);
     }
   }, [userIdParam, conversations]);
+  const seedMessages = selected?._id ? DEMO_MESSAGES_BY_OTHER[String(selected._id)] : undefined;
 
   useEffect(() => {
     const token = localStorage.getItem('rumi_token');
@@ -47,8 +52,16 @@ export function Messages() {
   }, [user?._id]);
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] min-h-0 bg-[#F7F8FC] p-4 lg:p-6 gap-4">
-      <div className="w-full lg:w-72 flex-shrink-0 rounded-2xl border border-slate-100 bg-white shadow-sm overflow-y-auto">
+    <>
+      {reportUser && (
+        <ReportModal
+          reportedUserId={reportUser._id}
+          reportedUserName={reportUser.name}
+          onClose={() => setReportUser(null)}
+        />
+      )}
+    <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] min-h-0 bg-gray-100 p-4 lg:p-6 gap-4">
+      <div className="w-full lg:w-72 flex-shrink-0 rounded-2xl bg-white shadow-sm overflow-y-auto">
         <h2 className="p-4 font-semibold text-slate-900 border-b border-slate-100">Messages</h2>
         {conversations.length === 0 ? (
           <p className="p-4 text-sm text-slate-500">No conversations yet. Accept a request to start chatting.</p>
@@ -81,6 +94,8 @@ export function Messages() {
             otherUser={selected}
             currentUserId={user?._id}
             socket={socket}
+            seedMessages={seedMessages}
+            onReport={setReportUser}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-slate-500">
@@ -89,5 +104,6 @@ export function Messages() {
         )}
       </div>
     </div>
+    </>
   );
 }

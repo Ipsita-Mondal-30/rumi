@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 
 export function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -15,6 +15,10 @@ export function ProtectedRoute({ children }) {
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  // Dashboard and sub-routes require a completed profile
+  if (location.pathname.startsWith('/dashboard') && user?.profileCompleted === false) {
+    return <Navigate to="/onboarding/profile" replace />;
   }
   return children;
 }
