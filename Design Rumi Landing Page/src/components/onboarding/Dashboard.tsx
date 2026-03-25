@@ -49,6 +49,7 @@ import {
 } from '../../services/api';
 import { API_BASE_URL } from '../../services/api';
 import { RecommendedRoomsSection } from '../explore/RecommendedRoomsSection';
+import { RoomDetailsModal } from '../explore/RoomDetailsModal';
 import { OfferRoomDashboard } from '../offer/OfferRoomDashboard';
 
 interface DashboardProps {
@@ -66,24 +67,27 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   const [intentResolved, setIntentResolved] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [swipeCards, setSwipeCards] = useState<any[]>([]);
-  const [requestsReceived, setRequestsReceived] = useState<any[]>([]);
-  const [sentRequests, setSentRequests] = useState<any[]>([]);
-  const [activeMatches, setActiveMatches] = useState<any[]>([]);
+  const [swipeCards, setSwipeCards] = useState([]);
+  const [requestsReceived, setRequestsReceived] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
+  const [activeMatches, setActiveMatches] = useState([]);
   const [sending, setSending] = useState(false);
 
-  const [chatWithUserId, setChatWithUserId] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatWithUserId, setChatWithUserId] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  const [avatarSrc, setAvatarSrc] = useState<string>('');
+  const [avatarSrc, setAvatarSrc] = useState('');
   const [isExploreLocked, setIsExploreLocked] = useState(false);
-  const [recommendedRooms, setRecommendedRooms] = useState<any[]>([]);
+  const [recommendedRooms, setRecommendedRooms] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [revealExploreMatches, setRevealExploreMatches] = useState(false);
   const [showExploreProfileModal, setShowExploreProfileModal] = useState(false);
   const scrollTriggerCountRef = useRef(0);
   const explorePromptShownRef = useRef(false);
+
+  const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
+  const [roomDetailsRoom, setRoomDetailsRoom] = useState(null);
 
   const normalizeImageUrl = (src?: string | null) => {
     if (!src) return '';
@@ -147,7 +151,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
     setLoading(true);
     try {
-      const [matchesRes, receivedRes, sentRes, receivedAcceptedRes] = await Promise.all([
+            const [matchesRes, receivedRes, sentRes, receivedAcceptedRes] = await Promise.all([
         getMatches({ limit: 20 }),
         getReceivedRequests(),
         getSentRequests(),
@@ -162,15 +166,20 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
       const mappedSwipe = matches.map((m: any) => {
         const u = m.user || m;
         const budgetDisplay = budgetToDisplay(u?.budgetRange);
+        const rawImg = u?.photo || u?.profilePicture;
+        const baseTags = deriveTags(u, m.reasons || []);
+        const hasRoom = u?.intent === 'offer';
+        const tags = hasRoom ? ['Has a room', ...baseTags].slice(0, 4) : baseTags;
         return {
           id: u._id,
           userId: u._id,
           name: u.name,
           age: u.age ?? '',
-          image: u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
+        image: rawImg ? normalizeImageUrl(rawImg) : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
           match: m.matchScore ?? m.compatibility ?? 0,
           bio: u.bio || '',
-          tags: deriveTags(u, m.reasons || []),
+          tags,
+          hasRoom,
           budget: budgetDisplay,
         };
       });
@@ -260,7 +269,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
         setRoomsLoading(true);
         try {
-          const roomsRes = await getRecommendedRooms(10);
+            const roomsRes = await getRecommendedRooms(30);
           setRecommendedRooms(roomsRes?.data?.rooms || []);
         } finally {
           setRoomsLoading(false);
@@ -692,6 +701,28 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                                       <DollarSign size={20} className="text-blue-600" />
                                       <span className="font-semibold">Budget: ₹{card.budget}k/month</span>
                                     </div>
+
+                                  {/* Offerer room details */}
+                                  {card.hasRoom && (() => {
+                                    const offerRoom =
+                                      recommendedRooms?.find(
+                                        (r: any) => String(r?.ownerUserId) === String(card.userId)
+                                      ) || null;
+                                    if (!offerRoom) return null;
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRoomDetailsRoom(offerRoom);
+                                          setRoomDetailsOpen(true);
+                                        }}
+                                        className="mt-4 w-full px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                                      >
+                                        View room details
+                                      </button>
+                                    );
+                                  })()}
                                   </div>
                                 </div>
                               </motion.div>
@@ -1019,6 +1050,15 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           </div>
         </div>
       </main>
+
+      <RoomDetailsModal
+        open={roomDetailsOpen}
+        room={roomDetailsRoom}
+        onClose={() => {
+          setRoomDetailsOpen(false);
+          setRoomDetailsRoom(null);
+        }}
+      />
 
       {/* Full-screen lock prompt for explore mode */}
       {showExploreProfileModal && (

@@ -163,16 +163,14 @@ export async function getRecommendedRooms(req, res) {
     const max = user.budgetRange?.max ?? 0;
 
     const matchCity = city ? { 'location.city': city } : {};
-    const rentQuery =
-      max > 0 && min > 0
-        ? { monthlyRent: { $gte: min, $lte: max } }
-        : { monthlyRent: { $gte: 0 } };
 
-    // Only show active listings to renters.
-    const baseQuery = { ...matchCity, ...rentQuery, status: 'active' };
+    // Only show active listings. Keep city filtering for performance.
+    // We intentionally do not enforce rent overlap here so we can show "all offer rooms"
+    // and compute compatibility percentage (including "Within budget") in the scorer.
+    const baseQuery = { ...matchCity, status: 'active' };
 
-    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 20);
-    const candidateLimit = Math.min(Math.max(limit * 5, 20), 60);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 60);
+    const candidateLimit = Math.min(Math.max(limit * 5, 30), 180);
 
     const buildTags = (room, score) => {
       const withinBudget = max > 0 && min > 0 && Number(room.monthlyRent ?? 0) >= min && Number(room.monthlyRent ?? 0) <= max;
@@ -184,11 +182,20 @@ export async function getRecommendedRooms(req, res) {
       return tags;
     };
 
-    const candidates = await Room.find(baseQuery)
-      .select('propertyType roomType location monthlyRent photoUrls flatmatePreferences status viewsCount createdAt')
+    let candidates = await Room.find(baseQuery)
+      .select('ownerUserId propertyType roomType location monthlyRent photoUrls roomDescription flatmatePreferences status viewsCount createdAt')
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
       .lean();
+
+    // Fallback: if no active rooms match the user's city, search across all active rooms.
+    if (!candidates.length && city) {
+      candidates = await Room.find({ status: 'active' })
+        .select('ownerUserId propertyType roomType location monthlyRent photoUrls roomDescription flatmatePreferences status viewsCount createdAt')
+        .sort({ createdAt: -1 })
+        .limit(candidateLimit)
+        .lean();
+    }
 
     const scored = candidates.map((room) => {
       const score = calculateMatchScore(user?.toObject?.() ?? user, room);
@@ -206,30 +213,19 @@ export async function getRecommendedRooms(req, res) {
     const strongThreshold = 70;
     const strong = scored.filter((r) => r.compatibility >= strongThreshold);
 
-    // If no strong matches, return trending active listings.
-    if (!strong.length) {
-      const trendingRooms = await Room.find({ status: 'active', ...matchCity })
-        .select('propertyType roomType location monthlyRent photoUrls flatmatePreferences status viewsCount createdAt')
-        .sort({ viewsCount: -1, createdAt: -1 })
-        .limit(limit)
-        .lean();
+    // If no strong matches, return "trending" (viewsCount-like ordering) but still include compatibility percentage.
+    const list = strong.length ? strong : scored;
 
-      const trendingScored = trendingRooms.map((room) => {
-        const score = calculateMatchScore(user?.toObject?.() ?? user, room);
-        return {
-          ...room,
-          compatibility: score,
-          matchScore: score,
-          coverUrl: room?.photoUrls?.[0] || '',
-          tags: [...buildTags(room, score), 'Trending'].slice(0, 3),
-        };
-      });
+    const withTrendingTag = list.map((r) => {
+      if (r.compatibility >= strongThreshold) return r;
+      return {
+        ...r,
+        tags: Array.isArray(r.tags) && r.tags.length > 0 ? [...r.tags, 'Trending'] : ['Trending'],
+      };
+    });
 
-      trendingScored.sort((a, b) => b.compatibility - a.compatibility);
-      return res.json({ success: true, rooms: trendingScored.slice(0, limit) });
-    }
-
-    return res.json({ success: true, rooms: strong.slice(0, limit) });
+    withTrendingTag.sort((a, b) => b.compatibility - a.compatibility);
+    return res.json({ success: true, rooms: withTrendingTag.slice(0, limit) });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('getRecommendedRooms error:', err);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users } from 'lucide-react';
 import { RecommendedRoomCard } from './RecommendedRoomCard';
+import { RoomDetailsModal } from './RoomDetailsModal';
 
 export type RecommendedRoomsSectionProps = {
   rooms: any[];
@@ -13,12 +14,15 @@ export const RecommendedRoomsSection = ({
   loading,
   title = 'Recommended Rooms',
 }: RecommendedRoomsSectionProps) => {
+  const [open, setOpen] = React.useState(false);
+  const [selectedRoom, setSelectedRoom] = React.useState<any | null>(null);
+
   return (
-    <div className="mt-8">
-      <div className="flex items-end justify-between gap-4 mb-4">
+    <div className="mt-6">
+      <div className="flex items-end justify-between gap-4 mb-3">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500 mt-1">Sorted by compatibility score</p>
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <p className="text-sm text-gray-500 mt-1">Sorted by compatibility</p>
         </div>
       </div>
 
@@ -32,12 +36,21 @@ export const RecommendedRoomsSection = ({
       ) : (
         <div className="overflow-x-auto pb-2">
           <div className="flex gap-4">
-            {rooms.slice(0, 10).map((room) => (
-              <RecommendedRoomCard key={room._id} room={room} />
+            {rooms.map((room) => (
+              <RecommendedRoomCard
+                key={room._id}
+                room={room}
+                onViewDetails={(r) => {
+                  setSelectedRoom(r);
+                  setOpen(true);
+                }}
+              />
             ))}
           </div>
         </div>
       )}
+
+      <RoomDetailsModal open={open} room={selectedRoom} onClose={() => setOpen(false)} />
     </div>
   );
 };
