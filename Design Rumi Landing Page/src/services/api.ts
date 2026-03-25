@@ -70,6 +70,11 @@ export async function getChatHistory(otherUserId: string) {
   return api.get('/chat/history', { params: { userId: otherUserId } });
 }
 
+// Assistant (Gemini)
+export async function sendAssistantMessage(payload: any) {
+  return api.post('/assistant/chat', payload);
+}
+
 // Profile
 export async function updateProfile(data: any) {
   return api.put('/user/profile', data);

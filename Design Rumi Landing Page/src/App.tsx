@@ -9,7 +9,7 @@ import { VerificationSuccessScreen } from './components/onboarding/VerificationS
 import { ProfileSetupFlow } from './components/onboarding/ProfileSetupFlow';
 import { FinalConfirmationScreen } from './components/onboarding/FinalConfirmationScreen';
 import { Dashboard } from './components/onboarding/Dashboard';
-import { getProfile } from './services/api';
+import { getProfile, sendAssistantMessage } from './services/api';
 
 // Font injection for Poppins
 
@@ -262,7 +262,7 @@ const PhoneScreen = () => {
   ]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [swipeTrigger, setSwipeTrigger] = useState<{ direction: 'left' | 'right' } | null>(null);
+  const [swipeTrigger, setSwipeTrigger] = useState(null);
 
   const handleSwipe = (direction: 'left' | 'right') => {
     setTimeout(() => {
@@ -732,7 +732,7 @@ const MinimalFeatureSection = () => {
 /* --- NEW HOW IT WORKS SECTION --- */
 
 const HowItWorksSection = () => {
-  const [activeTab, setActiveTab] = useState<'offer' | 'find'>('offer');
+  const [activeTab, setActiveTab] = useState('offer');
 
   const content = {
     offer: [
@@ -1179,25 +1179,57 @@ const Chatbot = () => {
     { id: 1, text: "Hi! I'm Rumi's AI assistant. How can I help you find your perfect flatmate today?", sender: 'bot' }
   ]);
   const [inputMessage, setInputMessage] = useState('');
+  const [isAssistantTyping, setIsAssistantTyping] = useState(false);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const callAssistant = async (nextMessages: Array<{ id: number; text: string; sender: 'user' | 'bot' }>, typingMessageId: number) => {
+    const apiMessages = nextMessages
+      .filter((m) => m.sender === 'user' || m.sender === 'bot')
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        text: m.text,
+      }));
+
+    const res = await sendAssistantMessage({ messages: apiMessages });
+    const reply = res?.data?.reply ?? '';
+
+    setMessages((prev) => [
+      ...prev.filter((m) => m.id !== typingMessageId),
+      { id: typingMessageId, text: reply || 'Okay — tell me a bit more.', sender: 'bot' },
+    ]);
+  };
+
+  const sendUserMessage = async (text: string) => {
+    if (!text.trim()) return;
+    if (isAssistantTyping) return;
+
+    const userMessageId = Date.now();
+    const userMessage = { id: userMessageId, text: text.trim(), sender: 'user' as const };
+    const nextMessages = [...messages, userMessage];
+
+    const typingMessageId = userMessageId + 1;
+    const typingMessage = { id: typingMessageId, text: 'Typing...', sender: 'bot' as const };
+
+    setMessages([...nextMessages, typingMessage]);
+    setIsAssistantTyping(true);
+    try {
+      await callAssistant(nextMessages, typingMessageId);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('assistant chat error:', err);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== typingMessageId),
+        { id: typingMessageId, text: 'Sorry — I could not generate a response. Please try again.', sender: 'bot' },
+      ]);
+    } finally {
+      setIsAssistantTyping(false);
+    }
+  };
+
+  const handleSendMessage = async (e: any) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
-
-    // Add user message
-    const userMessage = { id: Date.now(), text: inputMessage, sender: 'user' };
-    setMessages(prev => [...prev, userMessage]);
+    const text = inputMessage;
     setInputMessage('');
-
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = {
-        id: Date.now() + 1,
-        text: "Thanks for your message! I can help you with finding compatible flatmates, understanding our AI matching system, or answering questions about safety features. What would you like to know?",
-        sender: 'bot'
-      };
-      setMessages(prev => [...prev, botResponse]);
-    }, 1000);
+    await sendUserMessage(text);
   };
 
   return (
@@ -1265,13 +1297,28 @@ const Chatbot = () => {
             {/* Quick Actions */}
             <div className="px-4 py-2 bg-white border-t border-slate-100">
               <div className="flex gap-2 overflow-x-auto pb-2">
-                <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors">
+                <button
+                  type="button"
+                  disabled={isAssistantTyping}
+                  onClick={() => sendUserMessage("How does matching work?")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   How does matching work?
                 </button>
-                <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors">
+                <button
+                  type="button"
+                  disabled={isAssistantTyping}
+                  onClick={() => sendUserMessage("Pricing")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Pricing
                 </button>
-                <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors">
+                <button
+                  type="button"
+                  disabled={isAssistantTyping}
+                  onClick={() => sendUserMessage("Safety tips")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Safety tips
                 </button>
               </div>
@@ -1286,10 +1333,12 @@ const Chatbot = () => {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  disabled={isAssistantTyping}
                 />
                 <button
                   type="submit"
                   className="w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-colors shadow-md hover:shadow-lg"
+                  disabled={isAssistantTyping}
                 >
                   <Send size={18} />
                 </button>
@@ -1357,7 +1406,7 @@ const Chatbot = () => {
 const Footer = () => {
   const [email, setEmail] = useState('');
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = (e: any) => {
     e.preventDefault();
     // Handle subscription logic
     console.log('Subscribed:', email);
@@ -1583,7 +1632,7 @@ export default function App() {
     const token = localStorage.getItem('rumi_token');
     return token ? 'dashboard' : 'landing';
   });
-  const [profileFlowMode, setProfileFlowMode] = useState<'setup' | 'edit'>('setup');
+  const [profileFlowMode, setProfileFlowMode] = useState('setup');
   const [signupEmail, setSignupEmail] = useState(() => {
     try {
       const u = localStorage.getItem('rumi_user');

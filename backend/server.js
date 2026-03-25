@@ -13,10 +13,12 @@ import userRoutes from './routes/userRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import assistantRoutes from './routes/assistantRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// `.env` is expected to be inside this folder (`backend/.env`).
+dotenv.config({ path: path.join(__dirname, '.env') });
 const PORT = process.env.PORT || 4000;
 
 await connectDB();
@@ -33,6 +35,7 @@ app.use('/user', userRoutes);
 app.use('/matches', matchRoutes);
 app.use('/request', requestRoutes);
 app.use('/chat', chatRoutes);
+app.use('/assistant', assistantRoutes);
 app.use('/report', reportRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));

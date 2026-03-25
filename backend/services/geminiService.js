@@ -42,7 +42,7 @@ Match score: ${matchResult.matchScore}%. Matching reasons: ${(matchResult.reason
 Return only the explanation text, no labels or quotes.`;
 
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response?.text?.()?.trim();
@@ -50,5 +50,61 @@ Return only the explanation text, no labels or quotes.`;
   } catch (err) {
     console.error('Gemini API error:', err.message);
     return null;
+  }
+}
+
+/**
+ * Gemini-powered assistant chat.
+ * @param {{ messages?: Array<{role: 'user'|'assistant', text: string}>, message?: string }} payload
+ * @returns {Promise<string>}
+ */
+export async function getAssistantReply(payload) {
+  const client = getClient();
+  if (!client) {
+    return 'AI is not available right now. Please try again later.';
+  }
+
+  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+  const fallbackMessage = payload?.message ? String(payload.message) : '';
+
+  const safeMessages = messages
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant'))
+    .map((m) => ({
+      role: m.role,
+      text: String(m.text || ''),
+    }))
+    .filter((m) => m.text.trim().length > 0);
+
+  const lastUser =
+    fallbackMessage ||
+    [...safeMessages].reverse().find((m) => m.role === 'user')?.text ||
+    '';
+
+  const history = safeMessages
+    .slice(-10) // keep prompt short
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+    .join('\n');
+
+  const prompt = `You are Rumi's friendly assistant for flatmate matching.\n\n` +
+    `Your goals:\n` +
+    `1) Help users find compatible flatmates (based on their preferences and matching).\n` +
+    `2) Explain how the matching works in simple terms.\n` +
+    `3) Answer safety questions and suggest safe communication practices.\n\n` +
+    `Rules:\n` +
+    `- Be concise and helpful.\n` +
+    `- Do not invent personal details about specific users.\n` +
+    `- If the user asks for harmful or unsafe instructions, refuse and suggest safer alternatives.\n\n` +
+    `Conversation so far:\n${history || '(no prior messages)'}\n\n` +
+    `Now respond to the user:\nUser: ${lastUser}\nAssistant:`;
+
+  try {
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response?.text?.()?.trim();
+    return text || 'Okay — tell me a bit more.';
+  } catch (err) {
+    console.error('Gemini assistant API error:', err.message);
+    return 'Sorry — I could not generate a response. Please try again.';
   }
 }
