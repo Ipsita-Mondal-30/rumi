@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Menu, X, CheckCircle2, Check, Sparkles, Moon, Sun, DollarSign, Send, MessageCircle, Search, Coffee, Shield, Home, UserPlus, Key, FileText, Users, AlertTriangle, Ban, Zap } from "lucide-react";
+import { User, Menu, X, CheckCircle2, Check, Sparkles, Moon, Sun, DollarSign, Send, MessageCircle, Search, Coffee, Shield, Home, UserPlus, Key, FileText, Users, AlertTriangle, Ban, Zap, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { SignupScreen } from './components/onboarding/Signup';
 import { SignInScreen } from './components/onboarding/SignInScreen';
@@ -97,13 +97,13 @@ const ProfileCard = ({ name, role, match, image, verified = false }: { name: str
 );
 
 // Swipable Profile Card Component
-const SwipeCard = ({ 
-  profile, 
-  onSwipe, 
+const SwipeCard = ({
+  profile,
+  onSwipe,
   isTop,
   triggerSwipe
-}: { 
-  profile: any, 
+}: {
+  profile: any,
   onSwipe: (direction: 'left' | 'right') => void,
   isTop: boolean,
   triggerSwipe?: { direction: 'left' | 'right' } | null
@@ -134,13 +134,13 @@ const SwipeCard = ({
           onSwipe(info.offset.x > 0 ? 'right' : 'left');
         }
       }}
-      animate={{ 
+      animate={{
         x: exitX,
         rotate: exitX / 10,
         opacity: exitX !== 0 ? 0 : 1,
         scale: isTop ? 1 : 0.95
       }}
-      transition={{ 
+      transition={{
         type: "spring",
         stiffness: 300,
         damping: 30
@@ -150,25 +150,25 @@ const SwipeCard = ({
     >
       {/* Profile Image */}
       <div className="relative h-[65%] overflow-hidden">
-        <img 
-          src={profile.image} 
+        <img
+          src={profile.image}
           alt={profile.name}
           className="w-full h-full object-cover"
         />
-        
+
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40"></div>
 
         {/* Swipe Indicators */}
         {isDragging && (
           <>
-            <motion.div 
+            <motion.div
               className="absolute top-8 left-8 bg-red-500 text-white px-6 py-3 rounded-2xl font-bold text-lg transform -rotate-12 border-4 border-white shadow-xl"
               animate={{ opacity: exitX < -50 ? 1 : 0 }}
             >
               NOPE
             </motion.div>
-            <motion.div 
+            <motion.div
               className="absolute top-8 right-8 bg-green-500 text-white px-6 py-3 rounded-2xl font-bold text-lg transform rotate-12 border-4 border-white shadow-xl"
               animate={{ opacity: exitX > 50 ? 1 : 0 }}
             >
@@ -198,7 +198,7 @@ const SwipeCard = ({
         {/* Tags */}
         <div className="flex flex-wrap gap-2 mb-auto">
           {profile.tags.map((tag: string, index: number) => (
-            <span 
+            <span
               key={index}
               className="px-3 py-1 bg-slate-100 text-slate-700 text-xs rounded-full font-medium"
             >
@@ -287,7 +287,7 @@ const PhoneScreen = () => {
           <div className="w-3 h-2.5 bg-slate-900 rounded-[1px]"></div>
         </div>
       </div>
-      
+
       {/* Logo Header inside App */}
       <div className="px-6 py-4 flex justify-between items-center bg-white z-20">
         <span className="font-bold text-lg tracking-tight text-slate-900">Rumi</span>
@@ -302,16 +302,16 @@ const PhoneScreen = () => {
           <>
             {/* Show next card in background */}
             {currentIndex + 1 < profiles.length && (
-              <SwipeCard 
-                profile={profiles[currentIndex + 1]} 
+              <SwipeCard
+                profile={profiles[currentIndex + 1]}
                 onSwipe={handleSwipe}
                 isTop={false}
                 triggerSwipe={null}
               />
             )}
             {/* Show current card on top */}
-            <SwipeCard 
-              profile={profiles[currentIndex]} 
+            <SwipeCard
+              profile={profiles[currentIndex]}
               onSwipe={handleSwipe}
               isTop={true}
               triggerSwipe={swipeTrigger}
@@ -324,7 +324,7 @@ const PhoneScreen = () => {
                 <Users size={32} className="text-slate-400" />
               </div>
               <p className="text-slate-500 font-medium">No more profiles</p>
-              <button 
+              <button
                 onClick={() => setCurrentIndex(0)}
                 className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full text-sm font-semibold"
               >
@@ -337,20 +337,20 @@ const PhoneScreen = () => {
 
       {/* Action Buttons */}
       <div className="bg-white px-6 py-4 flex items-center justify-center gap-6 z-20">
-        <button 
+        <button
           onClick={() => handleButtonClick('left')}
           disabled={currentIndex >= profiles.length}
           className="w-14 h-14 rounded-full bg-white border-2 border-red-500 text-red-500 flex items-center justify-center shadow-md hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <X size={28} strokeWidth={3} />
         </button>
-        <button 
+        <button
           disabled={currentIndex >= profiles.length}
           className="w-12 h-12 rounded-full bg-white border-2 border-blue-500 text-blue-500 flex items-center justify-center shadow-md hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Sparkles size={20} />
         </button>
-        <button 
+        <button
           onClick={() => handleButtonClick('right')}
           disabled={currentIndex >= profiles.length}
           className="w-14 h-14 rounded-full bg-white border-2 border-green-500 text-green-500 flex items-center justify-center shadow-md hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -358,7 +358,7 @@ const PhoneScreen = () => {
           <Check size={28} strokeWidth={3} />
         </button>
       </div>
-      
+
       {/* Bottom Nav Bar Indicator */}
       <div className="h-1.5 w-32 bg-slate-900/20 rounded-full mx-auto mb-2 absolute bottom-2 left-0 right-0 z-20"></div>
     </div>
@@ -366,23 +366,23 @@ const PhoneScreen = () => {
 };
 
 // Used in Hero
-const FloatingCard = ({ 
-  title, 
-  subtitle, 
-  icon: Icon, 
-  colorClass, 
-  buttonText = "Connect", 
-  className 
-}: { 
-  title: string, 
-  subtitle: string, 
-  icon: any, 
-  colorClass: string, 
-  buttonText?: string, 
-  className?: string 
+const FloatingCard = ({
+  title,
+  subtitle,
+  icon: Icon,
+  colorClass,
+  buttonText = "Connect",
+  className
+}: {
+  title: string,
+  subtitle: string,
+  icon: any,
+  colorClass: string,
+  buttonText?: string,
+  className?: string
 }) => {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, delay: 0.2 }}
@@ -597,130 +597,130 @@ const MinimalFeatureSection = () => {
     <section className="w-full py-24 bg-white relative overflow-hidden">
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 lg:gap-24 items-center">
-          
+
           {/* Left Column: AI Matching Content */}
           <div className="text-left z-10 mt-16">
-             <motion.div 
-               initial={{ opacity: 0, y: 10 }}
-               whileInView={{ opacity: 1, y: 0 }}
-               viewport={{ once: true }}
-               transition={{ duration: 0.5 }}
-               className="inline-flex items-center gap-2 mb-4"
-             >
-               <Sparkles size={16} className="text-blue-500" />
-               <span className="text-blue-600 text-xs font-bold uppercase tracking-wider">AI Powered Flatmate Match</span>
-             </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 mb-4"
+            >
+              <Sparkles size={16} className="text-blue-500" />
+              <span className="text-blue-600 text-xs font-bold uppercase tracking-wider">AI Powered Flatmate Match</span>
+            </motion.div>
 
-             <motion.h2 
-               initial={{ opacity: 0, y: 10 }}
-               whileInView={{ opacity: 1, y: 0 }}
-               viewport={{ once: true }}
-               transition={{ duration: 0.5, delay: 0.1 }}
-               className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 leading-tight"
-             >
-               Turn Shared Living <br /> Into Comfort.
-             </motion.h2>
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 leading-tight"
+            >
+              Turn Shared Living <br /> Into Comfort.
+            </motion.h2>
 
-             <div className="space-y-6">
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-sm font-bold border border-green-100">
-                    92% Compatibility
-                  </div>
-                </motion.div>
-
-                <div className="flex flex-wrap gap-3">
-                   {["Quiet & Clean Flatmate", "Early Riser Roommate", "Budget Friendly Flatmate"].map((tag, i) => (
-                     <motion.span 
-                       key={i}
-                       initial={{ opacity: 0, y: 10 }}
-                       whileInView={{ opacity: 1, y: 0 }}
-                       viewport={{ once: true }}
-                       transition={{ duration: 0.4, delay: 0.3 + (i * 0.1) }}
-                       className="inline-flex items-center gap-1.5 text-slate-600 text-sm bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100"
-                     >
-                        <Check size={12} className="text-slate-400" /> {tag}
-                     </motion.span>
-                   ))}
+            <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="flex items-center gap-3"
+              >
+                <div className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-sm font-bold border border-green-100">
+                  92% Compatibility
                 </div>
-             </div>
+              </motion.div>
+
+              <div className="flex flex-wrap gap-3">
+                {["Quiet & Clean Flatmate", "Early Riser Roommate", "Budget Friendly Flatmate"].map((tag, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 0.3 + (i * 0.1) }}
+                    className="inline-flex items-center gap-1.5 text-slate-600 text-sm bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100"
+                  >
+                    <Check size={12} className="text-slate-400" /> {tag}
+                  </motion.span>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Safe Communication Content & Chat UI */}
           <div className="text-left z-10 relative pl-0 md:pl-10">
-             
-             {/* Text Content */}
-             <div className="mb-10 relative z-20">
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5 }}
-                  className="inline-flex items-center gap-2 mb-4"
-                >
-                  <Shield size={16} className="text-emerald-500" />
-                  <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider">Safe Communication</span>
-                </motion.div>
 
-                <motion.h2 
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                  className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 leading-tight"
-                >
-                  Safe Communication With <br /> Your Rumi Matches.
-                </motion.h2>
+            {/* Text Content */}
+            <div className="mb-10 relative z-20">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="inline-flex items-center gap-2 mb-4"
+              >
+                <Shield size={16} className="text-emerald-500" />
+                <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider">Safe Communication</span>
+              </motion.div>
 
-                <motion.p 
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="text-slate-500 text-lg font-light leading-relaxed"
-                >
-                  Secure in-app chat system for flatmate discussions.
-                </motion.p>
-             </div>
+              <motion.h2
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 leading-tight"
+              >
+                Safe Communication With <br /> Your Rumi Matches.
+              </motion.h2>
 
-             {/* Minimal Chat UI Preview - Floating to the right/bottom */}
-             <div className="relative h-[200px] w-full flex items-center justify-start md:justify-center">
-                {/* Abstract Background Blur */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl -z-10"></div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="text-slate-500 text-lg font-light leading-relaxed"
+              >
+                Secure in-app chat system for flatmate discussions.
+              </motion.p>
+            </div>
 
-                <motion.div 
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
-                  className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100/60 max-w-[280px] w-full ml-auto mr-auto md:mr-0 md:ml-auto transform rotate-1"
-                >
-                   {/* Chat Bubble 1 */}
-                   <div className="flex gap-3 mb-4">
-                     <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs shrink-0">J</div>
-                     <div className="bg-slate-50 p-3 rounded-2xl rounded-tl-none text-xs text-slate-600 leading-relaxed">
-                       Hi! I saw we're a 92% match. Are you still looking?
-                     </div>
-                   </div>
+            {/* Minimal Chat UI Preview - Floating to the right/bottom */}
+            <div className="relative h-[200px] w-full flex items-center justify-start md:justify-center">
+              {/* Abstract Background Blur */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl -z-10"></div>
 
-                   {/* Chat Bubble 2 (User) */}
-                   <div className="flex gap-3 justify-end mb-2">
-                     <div className="bg-blue-500 p-3 rounded-2xl rounded-tr-none text-xs text-white leading-relaxed">
-                       Hey! Yes, I am. Your profile looks great!
-                     </div>
-                   </div>
-                   
-                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50">
-                      <div className="h-2 w-2 rounded-full bg-green-400"></div>
-                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Secure Chat</span>
-                   </div>
-                </motion.div>
-             </div>
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100/60 max-w-[280px] w-full ml-auto mr-auto md:mr-0 md:ml-auto transform rotate-1"
+              >
+                {/* Chat Bubble 1 */}
+                <div className="flex gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs shrink-0">J</div>
+                  <div className="bg-slate-50 p-3 rounded-2xl rounded-tl-none text-xs text-slate-600 leading-relaxed">
+                    Hi! I saw we're a 92% match. Are you still looking?
+                  </div>
+                </div>
+
+                {/* Chat Bubble 2 (User) */}
+                <div className="flex gap-3 justify-end mb-2">
+                  <div className="bg-blue-500 p-3 rounded-2xl rounded-tr-none text-xs text-white leading-relaxed">
+                    Hey! Yes, I am. Your profile looks great!
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50">
+                  <div className="h-2 w-2 rounded-full bg-green-400"></div>
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Secure Chat</span>
+                </div>
+              </motion.div>
+            </div>
 
           </div>
         </div>
@@ -736,22 +736,22 @@ const HowItWorksSection = () => {
 
   const content = {
     offer: [
-      { 
-        title: "List Your Room", 
+      {
+        title: "List Your Room",
         desc: "Add details about your space and preferences.",
         icon: Home,
         color: "text-blue-500",
         bg: "bg-blue-50"
       },
-      { 
-        title: "Create Profile", 
+      {
+        title: "Create Profile",
         desc: "Tell others about yourself and your living expectations.",
         icon: UserPlus,
         color: "text-indigo-500",
         bg: "bg-indigo-50"
       },
-      { 
-        title: "Connect & Finalize", 
+      {
+        title: "Connect & Finalize",
         desc: "Chat with matches and finalize your flatmate.",
         icon: MessageCircle,
         color: "text-emerald-500",
@@ -759,22 +759,22 @@ const HowItWorksSection = () => {
       }
     ],
     find: [
-      { 
-        title: "Create Profile", 
+      {
+        title: "Create Profile",
         desc: "Add lifestyle, budget, and roommate preferences.",
         icon: FileText,
         color: "text-blue-500",
         bg: "bg-blue-50"
       },
-      { 
-        title: "Look for Match", 
+      {
+        title: "Look for Match",
         desc: "Browse compatible rooms and flatmates.",
         icon: Search,
         color: "text-indigo-500",
         bg: "bg-indigo-50"
       },
-      { 
-        title: "Connect & Book", 
+      {
+        title: "Connect & Book",
         desc: "Chat securely and finalize your stay.",
         icon: Key,
         color: "text-emerald-500",
@@ -787,58 +787,58 @@ const HowItWorksSection = () => {
     <section className="w-full py-24 bg-white relative overflow-hidden border-t border-slate-50">
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="text-center mb-16">
-           <motion.h2 
-             initial={{ opacity: 0, y: 10 }}
-             whileInView={{ opacity: 1, y: 0 }}
-             viewport={{ once: true }}
-             transition={{ duration: 0.5 }}
-             className="text-3xl md:text-4xl font-bold text-slate-900 mb-4"
-           >
-             How Rumi Works
-           </motion.h2>
-           <motion.p 
-             initial={{ opacity: 0, y: 10 }}
-             whileInView={{ opacity: 1, y: 0 }}
-             viewport={{ once: true }}
-             transition={{ duration: 0.5, delay: 0.1 }}
-             className="text-slate-500 text-lg font-light mb-8"
-           >
-             Find or offer the perfect flatmate in just a few steps.
-           </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-3xl md:text-4xl font-bold text-slate-900 mb-4"
+          >
+            How Rumi Works
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-slate-500 text-lg font-light mb-8"
+          >
+            Find or offer the perfect flatmate in just a few steps.
+          </motion.p>
 
-           {/* Toggle Switch */}
-           <motion.div 
-             initial={{ opacity: 0, scale: 0.95 }}
-             whileInView={{ opacity: 1, scale: 1 }}
-             viewport={{ once: true }}
-             transition={{ duration: 0.5, delay: 0.2 }}
-             className="inline-flex p-1.5 bg-slate-100 rounded-full relative"
-           >
-             {/* Highlight Background */}
-             <motion.div 
-                className="absolute top-1.5 bottom-1.5 rounded-full bg-gradient-to-r from-[#081A35] to-[#4E668A] shadow-md z-0"
-                layout
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                style={{ 
-                  left: activeTab === 'offer' ? '6px' : '50%', 
-                  width: 'calc(50% - 9px)',
-                  x: activeTab === 'find' ? '3px' : '0' 
-                }}
-             />
+          {/* Toggle Switch */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="inline-flex p-1.5 bg-slate-100 rounded-full relative"
+          >
+            {/* Highlight Background */}
+            <motion.div
+              className="absolute top-1.5 bottom-1.5 rounded-full bg-gradient-to-r from-[#081A35] to-[#4E668A] shadow-md z-0"
+              layout
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              style={{
+                left: activeTab === 'offer' ? '6px' : '50%',
+                width: 'calc(50% - 9px)',
+                x: activeTab === 'find' ? '3px' : '0'
+              }}
+            />
 
-             <button 
-               onClick={() => setActiveTab('offer')}
-               className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200 ${activeTab === 'offer' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-               Offer a Room
-             </button>
-             <button 
-               onClick={() => setActiveTab('find')}
-               className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200 ${activeTab === 'find' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-               Find a Room
-             </button>
-           </motion.div>
+            <button
+              onClick={() => setActiveTab('offer')}
+              className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200 ${activeTab === 'offer' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Offer a Room
+            </button>
+            <button
+              onClick={() => setActiveTab('find')}
+              className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200 ${activeTab === 'find' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Find a Room
+            </button>
+          </motion.div>
         </div>
 
         {/* Dynamic Steps Content */}
@@ -861,7 +861,7 @@ const HowItWorksSection = () => {
                   <p className="text-slate-500 text-sm leading-relaxed max-w-xs font-light">
                     {step.desc}
                   </p>
-                  
+
                   {/* Connector Line (Hidden on last item and mobile) */}
                   {index < 2 && (
                     <div className="hidden md:block absolute top-[2.5rem] left-[calc(16.666%+5rem)] w-[calc(33.333%-10rem)] h-px bg-slate-100 -z-10">
@@ -874,6 +874,90 @@ const HowItWorksSection = () => {
           </AnimatePresence>
         </div>
 
+      </div>
+    </section>
+  );
+};
+
+/* --- POPULAR CITIES SECTION --- */
+
+const PopularCitiesSection = ({ onSignup }: { onSignup: () => void }) => {
+  const cities = [
+    { name: "Delhi", image: "https://images.unsplash.com/photo-1587474260584-136574528ed5?q=80&w=600&auto=format&fit=crop" },
+    { name: "Mumbai", image: "https://images.unsplash.com/photo-1562979314-bee7453e911c?q=80&w=600&auto=format&fit=crop" },
+    { name: "Noida", image: "https://images.unsplash.com/photo-1583037189850-1921ae7c6c22?q=80&w=600&auto=format&fit=crop" },
+    { name: "Bangalore", image: "https://images.pexels.com/photos/739987/pexels-photo-739987.jpeg?cs=srgb&dl=pexels-vivek-chugh-157138-739987.jpg&fm=jpg" },
+    { name: "Pune", image: "https://images.unsplash.com/photo-1715678710159-ee67d5bdba85?q=80&w=1035&auto=format&fit=crop" },
+    { name: "Ahmedabad", image: "https://images.pexels.com/photos/2409361/pexels-photo-2409361.jpeg?cs=srgb&dl=pexels-mukund-patel-1264723-2409361.jpg&fm=jpg" },
+    { name: "Gurgaon", image: "https://images.unsplash.com/photo-1514392181188-8f5d54262fa5?fm=jpg&q=60&w=3000&auto=format&fit=crop" },
+    { name: "Hyderabad", image: "https://images.unsplash.com/photo-1551161242-b5af797b7233?fm=jpg&q=60&w=3000&auto=format&fit=crop" },
+    { name: "Kolkata", image: "https://plus.unsplash.com/premium_photo-1697730414399-3d4d9ada98bd?fm=jpg&q=60&w=3000&auto=format&fit=crop" },
+    { name: "Chennai", image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?q=80&w=600&auto=format&fit=crop" },
+    { name: "Chandigarh", image: "https://www.shutterstock.com/image-photo/open-hand-monument-chandigarh-symbol-600nw-2385266827.jpg" },
+    { name: "Jaipur", image: "https://cdn.pixabay.com/photo/2021/04/06/11/22/hawa-mahal-6156123_1280.jpg" }
+  ];
+
+  return (
+    <section className="w-full py-24 bg-white">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-5xl md:text-4xl font-bold text-slate-900 text-center mb-16"
+        >
+          View rooms in Popular Cities
+        </motion.h2>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-16">
+          {cities.map((city, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: index * 0.05 }}
+              className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg group cursor-pointer"
+            >
+              <img
+                src={city.image}
+                alt={city.name}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition-colors duration-300"></div>
+
+              {/* City Name */}
+              <div className="absolute inset-x-0 bottom-6 px-4">
+                <h3 className="text-white font-bold text-center text-sm md:text-base tracking-wider uppercase drop-shadow-md">
+                  {city.name}
+                </h3>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* View All Cities Button */}
+        <div className="flex justify-center mt-12 relative z-10">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onSignup}
+            aria-label="View all cities"
+            // explicit inline gradient to avoid any Tailwind class overrides
+            style={{ backgroundImage: 'linear-gradient(90deg, #34d399 0%, #10b981 100%)' }}
+            className="relative inline-flex items-center justify-center text-white px-8 py-3 rounded-full font-semibold text-lg shadow-lg transition-transform min-w-[300px]"
+          >
+            {/* Centered label */}
+            <span className="z-10">View All Cities</span>
+
+            
+            
+
+            {/* decorative ring removed to avoid overlaying background */}
+          </motion.button>
+        </div>
       </div>
     </section>
   );
@@ -959,9 +1043,9 @@ const TestimonialsSection = () => {
             >
               {/* Quote Icon */}
               <div className="mb-4">
-                <svg 
-                  className="w-8 h-8 text-blue-500/20 group-hover:text-blue-500/30 transition-colors" 
-                  fill="currentColor" 
+                <svg
+                  className="w-8 h-8 text-blue-500/20 group-hover:text-blue-500/30 transition-colors"
+                  fill="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
@@ -975,7 +1059,7 @@ const TestimonialsSection = () => {
 
               {/* User Info */}
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                <img 
+                <img
                   src={testimonial.image}
                   alt={testimonial.name}
                   className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
@@ -1282,11 +1366,10 @@ const Chatbot = () => {
                     </div>
                   )}
                   <div
-                    className={`max-w-[75%] p-3 rounded-2xl text-sm ${
-                      message.sender === 'user'
-                        ? 'bg-blue-500 text-white rounded-tr-none'
-                        : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
-                    }`}
+                    className={`max-w-[75%] p-3 rounded-2xl text-sm ${message.sender === 'user'
+                      ? 'bg-blue-500 text-white rounded-tr-none'
+                      : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
+                      }`}
                   >
                     {message.text}
                   </div>
@@ -1426,7 +1509,7 @@ const Footer = () => {
           >
             <Sparkles size={20} className="text-blue-500 absolute -top-2 -right-6" />
           </motion.div>
-          
+
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1436,7 +1519,7 @@ const Footer = () => {
           >
             Ready To Find Your <br className="hidden sm:block" />Perfect Flatmate?
           </motion.h2>
-          
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1694,7 +1777,7 @@ export default function App() {
     return (
       <div className="w-full font-sans selection:bg-blue-200">
         <FontStyles />
-        <SignupScreen 
+        <SignupScreen
           onNext={(email) => {
             setSignupEmail(email);
             setCurrentView('otp');
@@ -1723,7 +1806,7 @@ export default function App() {
     return (
       <div className="w-full font-sans selection:bg-blue-200">
         <FontStyles />
-        <VerificationSuccessScreen 
+        <VerificationSuccessScreen
           onContinue={() => {
             setProfileFlowMode('setup');
             setCurrentView('profile');
@@ -1737,9 +1820,9 @@ export default function App() {
     return (
       <div className="w-full font-sans selection:bg-blue-200">
         <FontStyles />
-        <ProfileSetupFlow 
+        <ProfileSetupFlow
           mode={profileFlowMode}
-          onComplete={() => setCurrentView(profileFlowMode === 'edit' ? 'dashboard' : 'confirmation')} 
+          onComplete={() => setCurrentView(profileFlowMode === 'edit' ? 'dashboard' : 'confirmation')}
         />
       </div>
     );
@@ -1749,8 +1832,8 @@ export default function App() {
     return (
       <div className="w-full font-sans selection:bg-blue-200">
         <FontStyles />
-        <FinalConfirmationScreen 
-          onDashboard={() => setCurrentView('dashboard')} 
+        <FinalConfirmationScreen
+          onDashboard={() => setCurrentView('dashboard')}
         />
       </div>
     );
@@ -1760,7 +1843,7 @@ export default function App() {
     return (
       <div className="w-full font-sans selection:bg-blue-200">
         <FontStyles />
-        <SignInScreen 
+        <SignInScreen
           onLoginSuccess={(email) => {
             setSignupEmail(email);
             setCurrentView('dashboard');
@@ -1793,68 +1876,68 @@ export default function App() {
       <section className="min-h-screen w-full relative overflow-hidden flex flex-col items-center">
         {/* Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#081A35] via-[#4E668A] to-[#E9E9E9] z-0"></div>
-        
+
         {/* Ambient Lighting/Glow (Subtle) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[500px] bg-blue-400/10 blur-[120px] rounded-full pointer-events-none"></div>
-  
+
         <main className="relative z-10 container mx-auto px-4 pt-32 pb-20 flex flex-col items-center">
-          
+
           {/* Hero Text */}
           <div className="text-center max-w-3xl mx-auto mb-16 relative">
-             <motion.div 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6 }}
-               className="flex justify-center mb-6"
-             >
-               <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full flex items-center gap-2">
-                 <span className="flex h-2 w-2 relative">
-                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                 </span>
-                 <span className="text-blue-50 text-xs font-medium tracking-wide uppercase">New Way to Live</span>
-               </div>
-             </motion.div>
-  
-             <motion.h1 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6, delay: 0.1 }}
-               className="text-5xl md:text-6xl font-bold text-white mb-6 leading-[1.1] tracking-tight drop-shadow-sm"
-             >
-               Find Your Perfect Flatmate <br className="hidden md:block"/>
-               With <span className="text-blue-200">Smart Matching</span>
-             </motion.h1>
-             
-             <motion.p 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6, delay: 0.2 }}
-               className="text-lg text-slate-200 mb-10 max-w-2xl mx-auto leading-relaxed font-light"
-             >
-               Rumi matches you with compatible flatmates based on lifestyle, habits, and preferences — so you find people, not just rooms.
-             </motion.p>
-             
-             <motion.div 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6, delay: 0.3 }}
-               className="flex flex-col sm:flex-row items-center justify-center gap-4"
-             >
-               <button onClick={() => setCurrentView('signup')} className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-8 py-4 rounded-full font-semibold text-lg transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1 w-full sm:w-auto">
-                 Start Matching
-               </button>
-               <button className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/30 px-8 py-4 rounded-full font-semibold text-lg transition-all w-full sm:w-auto">
-                 Explore Features
-               </button>
-             </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="flex justify-center mb-6"
+            >
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full flex items-center gap-2">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                <span className="text-blue-50 text-xs font-medium tracking-wide uppercase">New Way to Live</span>
+              </div>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-5xl md:text-6xl font-bold text-white mb-6 leading-[1.1] tracking-tight drop-shadow-sm"
+            >
+              Find Your Perfect Flatmate <br className="hidden md:block" />
+              With <span className="text-blue-200">Smart Matching</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-lg text-slate-200 mb-10 max-w-2xl mx-auto leading-relaxed font-light"
+            >
+              Rumi matches you with compatible flatmates based on lifestyle, habits, and preferences — so you find people, not just rooms.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
+              <button onClick={() => setCurrentView('signup')} className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-8 py-4 rounded-full font-semibold text-lg transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1 w-full sm:w-auto">
+                Start Matching
+              </button>
+              <button className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/30 px-8 py-4 rounded-full font-semibold text-lg transition-all w-full sm:w-auto">
+                Explore Features
+              </button>
+            </motion.div>
           </div>
-  
+
           {/* Main Visual Area */}
           <div className="relative w-full max-w-5xl mx-auto h-[600px] flex justify-center items-center mt-8">
-            
+
             {/* Central Phone */}
-            <motion.div 
+            <motion.div
               initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4, type: "spring" }}
@@ -1863,9 +1946,9 @@ export default function App() {
             >
               <PhoneScreen />
             </motion.div>
-  
+
             {/* Floating Cards - Left Side */}
-            <FloatingCard 
+            <FloatingCard
               title="Clean & Quiet"
               subtitle="Prefers a tidy space and quiet evenings. Non-smoker."
               icon={Moon}
@@ -1873,8 +1956,8 @@ export default function App() {
               className="hidden md:block -left-10 top-20 -rotate-6"
               buttonText="View Profile"
             />
-  
-             <FloatingCard 
+
+            <FloatingCard
               title="Designer Flatshare"
               subtitle="Looking for a creative roommate in Brooklyn."
               icon={Search}
@@ -1882,9 +1965,9 @@ export default function App() {
               className="hidden md:block left-0 bottom-32 rotate-6"
               buttonText="Apply Now"
             />
-  
+
             {/* Floating Cards - Right Side */}
-            <FloatingCard 
+            <FloatingCard
               title="Budget: ₹1200/mo"
               subtitle="Looking for a room in a shared apartment. Bills included."
               icon={DollarSign}
@@ -1892,8 +1975,8 @@ export default function App() {
               className="hidden md:block -right-4 top-12 rotate-12"
               buttonText="Connect"
             />
-  
-            <FloatingCard 
+
+            <FloatingCard
               title="Pet Friendly"
               subtitle="I have a golden retriever named Max. He loves people!"
               icon={Coffee}
@@ -1901,12 +1984,12 @@ export default function App() {
               className="hidden md:block right-10 bottom-40 -rotate-3"
               buttonText="Meet Max"
             />
-  
+
             {/* Decorative Elements (Grid lines like reference) */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
-               <div className="absolute top-1/2 left-0 right-0 h-px bg-white"></div>
-               <div className="absolute left-1/4 top-0 bottom-0 w-px bg-white"></div>
-               <div className="absolute right-1/4 top-0 bottom-0 w-px bg-white"></div>
+              <div className="absolute top-1/2 left-0 right-0 h-px bg-white"></div>
+              <div className="absolute left-1/4 top-0 bottom-0 w-px bg-white"></div>
+              <div className="absolute right-1/4 top-0 bottom-0 w-px bg-white"></div>
             </div>
           </div>
         </main>
@@ -1923,6 +2006,9 @@ export default function App() {
 
       {/* NEW HOW IT WORKS SECTION */}
       <HowItWorksSection />
+
+      {/* POPULAR CITIES SECTION */}
+      <PopularCitiesSection onSignup={() => setCurrentView('signup')} />
 
       {/* TRUST & SAFETY SECTION */}
       <TrustSafetySection />
