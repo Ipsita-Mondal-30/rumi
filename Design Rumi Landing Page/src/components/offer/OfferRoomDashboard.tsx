@@ -6,11 +6,28 @@ import {
   MessageCircle,
   Plus,
   Search,
+  Send,
   Settings,
   LogOut,
   Users,
 } from 'lucide-react';
-import { API_BASE_URL, getChatHistoryWithRoom, getChatThreads, getMyRooms, getProfile, getRoomReceivedRequests, getRoomSuggestions, incrementRoomView, inviteToConnect, updateRoom, updateRoomStatus, createRoom, deleteRoom } from '../../services/api';
+import {
+  API_BASE_URL,
+  getChatHistoryWithRoom,
+  getChatThreads,
+  getMyRooms,
+  getProfile,
+  getRoomReceivedRequests,
+  getRoomSuggestions,
+  getSentRequests,
+  incrementRoomView,
+  inviteToConnect,
+  updateRoom,
+  updateRoomStatus,
+  createRoom,
+  deleteRoom,
+} from '../../services/api';
+import { getChatSocket } from '../../services/chatSocket';
 import { acceptRequest, rejectRequest } from '../../services/api';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { RoomFormModal } from './RoomFormModal';
@@ -43,6 +60,8 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
 
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [inviteBanner, setInviteBanner] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [actionSending, setActionSending] = useState(false);
 
@@ -50,6 +69,8 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
   const [chatLoading, setChatLoading] = useState(false);
   const [activeOtherUserId, setActiveOtherUserId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [roomChatDraft, setRoomChatDraft] = useState('');
+  const [roomChatSending, setRoomChatSending] = useState(false);
 
   const [roomModalOpen, setRoomModalOpen] = useState(false);
   const [roomModalMode, setRoomModalMode] = useState<'create' | 'edit'>('create');
@@ -112,10 +133,11 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
       // Track views when owner opens a room in the dashboard.
       await incrementRoomView(roomId).catch(() => {});
 
-      const [reqRes, threadRes, suggRes] = await Promise.all([
+      const [reqRes, threadRes, suggRes, sentRes] = await Promise.all([
         getRoomReceivedRequests(roomId),
         getChatThreads(roomId),
         getRoomSuggestions(roomId, 10),
+        getSentRequests({ roomId }),
       ]);
 
       const reqs = reqRes?.data?.requests || [];
@@ -148,6 +170,9 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
           image: normalizeImageUrl(s?.image || ''),
         }))
       );
+
+      const sentList = sentRes?.data?.requests || [];
+      setPendingInvites(sentList.filter((r: any) => r.status === 'pending'));
     } finally {
       setIncomingLoading(false);
       setThreadsLoading(false);
@@ -211,6 +236,7 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
 
   const reloadEverything = async () => {
     await loadListings();
+    if (selectedRoomId) await loadRoomPanels(String(selectedRoomId));
   };
 
   const handleAcceptRequest = async (requestId: string) => {
@@ -234,6 +260,77 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
       setActionSending(false);
     }
   };
+
+  const sendRoomChatMessage = async () => {
+    const text = roomChatDraft.trim();
+    if (!text || !activeOtherUserId || !selectedRoomId || roomChatSending) return;
+    const sock = getChatSocket();
+    if (!sock) return;
+    if (!sock.connected) sock.connect();
+
+    setRoomChatSending(true);
+    const failSafe = window.setTimeout(() => setRoomChatSending(false), 12000);
+    const onSent = async () => {
+      window.clearTimeout(failSafe);
+      sock.off('message_sent', onSent);
+      setRoomChatDraft('');
+      setRoomChatSending(false);
+      try {
+        const res = await getChatHistoryWithRoom(activeOtherUserId, selectedRoomId);
+        setChatMessages(res?.data?.messages || []);
+        const tr = await getChatThreads(selectedRoomId);
+        setChatThreads(tr?.data?.threads || []);
+      } catch {
+        // ignore
+      }
+    };
+    sock.once('message_sent', onSent);
+    sock.emit('message', {
+      receiverId: activeOtherUserId,
+      message: text,
+      roomId: selectedRoomId,
+    });
+  };
+
+  useEffect(() => {
+    if (!chatOpen || !activeOtherUserId || !selectedRoomId) return;
+    const s = getChatSocket();
+    if (!s) return;
+    let meId = '';
+    try {
+      meId = JSON.parse(localStorage.getItem('rumi_user') || '{}')?._id || '';
+    } catch {
+      return;
+    }
+    const roomId = String(selectedRoomId);
+    const other = String(activeOtherUserId);
+    const onIncoming = (payload: any) => {
+      const a = String(payload.senderId ?? '');
+      const b = String(payload.receiverId ?? '');
+      const pairOk =
+        (a === meId && b === other) || (a === other && b === meId);
+      if (!pairOk) return;
+      const pRoom = payload.roomId ? String(payload.roomId) : '';
+      if (pRoom !== roomId) return;
+      setChatMessages((prev) => {
+        if (prev.some((m: any) => String(m._id) === String(payload._id))) return prev;
+        return [
+          ...prev,
+          {
+            _id: payload._id,
+            message: payload.message,
+            senderId: { _id: a, name: '' },
+            isOwn: a === meId,
+            timestamp: payload.timestamp,
+          },
+        ];
+      });
+    };
+    s.on('message', onIncoming);
+    return () => {
+      s.off('message', onIncoming);
+    };
+  }, [chatOpen, activeOtherUserId, selectedRoomId]);
 
   const handleTogglePause = async (roomId: string) => {
     setActionSending(true);
@@ -598,6 +695,64 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
                 )}
               </div>
 
+              {/* Outgoing invites (owner → seeker); seeker accepts on their Find dashboard */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                  <Send size={20} className="text-blue-600" />
+                  Invites you&apos;ve sent
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Pending until they accept in their account. After acceptance, open Active Chats.
+                </p>
+                {inviteBanner ? (
+                  <div
+                    className={`mb-4 text-sm rounded-xl px-3 py-2 border ${
+                      inviteBanner.ok
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                        : 'bg-red-50 text-red-700 border-red-100'
+                    }`}
+                  >
+                    {inviteBanner.text}
+                  </div>
+                ) : null}
+                {!selectedRoomId ? (
+                  <div className="text-sm text-gray-500">Select a listing.</div>
+                ) : incomingLoading ? (
+                  <div className="text-sm text-gray-500">Loading…</div>
+                ) : pendingInvites.length === 0 ? (
+                  <div className="text-sm text-gray-600 bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                    No pending invites. Use Suggested Matches below.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingInvites.map((req: any) => {
+                      const u = req.toUserId || {};
+                      return (
+                        <div
+                          key={String(req._id)}
+                          className="flex items-center gap-3 border border-gray-100 rounded-2xl p-3"
+                        >
+                          <img
+                            src={
+                              normalizeImageUrl(u.photo || u.profilePicture) ||
+                              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
+                            }
+                            alt=""
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {u.name || 'User'}
+                            </p>
+                            <p className="text-xs text-amber-600 font-medium">Awaiting their response</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Active Chats */}
               <div ref={chatsCardRef} className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -698,11 +853,23 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
                         suggestion={s}
                         onInvite={() => {
                           if (!selectedRoomId) return;
-                          inviteToConnect(s.userId, selectedRoomId)
+                          setInviteBanner(null);
+                          inviteToConnect(s.userId, String(selectedRoomId))
                             .then(async () => {
+                              setInviteBanner({
+                                ok: true,
+                                text: 'Invite sent. They can accept it from their Find dashboard under Requests Received.',
+                              });
                               await reloadEverything();
+                              window.setTimeout(() => setInviteBanner(null), 6000);
                             })
-                            .catch(() => {});
+                            .catch((err: any) => {
+                              const msg =
+                                err?.response?.data?.message ||
+                                err?.message ||
+                                'Could not send invite.';
+                              setInviteBanner({ ok: false, text: msg });
+                            });
                         }}
                       />
                     ))}
@@ -748,6 +915,7 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
                   setChatOpen(false);
                   setChatMessages([]);
                   setActiveOtherUserId(null);
+                  setRoomChatDraft('');
                 }}
                 className="w-10 h-10 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center"
               >
@@ -781,12 +949,28 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-100">
+            <div className="p-6 border-t border-gray-100 flex gap-2">
               <input
-                disabled
-                value="Message sending is not enabled in this build."
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500"
+                value={roomChatDraft}
+                onChange={(e) => setRoomChatDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void sendRoomChatMessage();
+                  }
+                }}
+                disabled={roomChatSending}
+                placeholder="Type a message…"
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 disabled:bg-gray-50"
               />
+              <button
+                type="button"
+                onClick={() => void sendRoomChatMessage()}
+                disabled={roomChatSending || !roomChatDraft.trim()}
+                className="px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send
+              </button>
             </div>
           </div>
         </div>

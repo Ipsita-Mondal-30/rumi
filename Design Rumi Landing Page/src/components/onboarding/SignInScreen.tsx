@@ -43,7 +43,10 @@ export const SignInScreen = ({ onLoginSuccess, onForgotPassword, onSignup }: Sig
     if (mode === 'password') {
       try {
         setSubmitting(true);
-        const res = await login({ email: email.trim(), password });
+        const res = await login({
+          email: email.trim().toLowerCase(),
+          password,
+        });
         const token = res?.data?.token;
         const user = res?.data?.user;
         if (token) localStorage.setItem('rumi_token', token);
@@ -57,7 +60,7 @@ export const SignInScreen = ({ onLoginSuccess, onForgotPassword, onSignup }: Sig
     } else if (mode === 'otp-request') {
       try {
         setSubmitting(true);
-        await sendOtp({ email: email.trim() });
+        await sendOtp({ email: email.trim().toLowerCase() });
         setMode('otp-verify');
       } catch (err: any) {
         setError(err?.response?.data?.message || err?.message || 'OTP request failed.');
@@ -76,17 +79,22 @@ export const SignInScreen = ({ onLoginSuccess, onForgotPassword, onSignup }: Sig
         onVerify={async (code) => {
           try {
             setSubmitting(true);
-            const res = await verifyOtp({ email: email.trim(), code });
+            const res = await verifyOtp({ email: email.trim().toLowerCase(), code });
             const token = res?.data?.token;
             const user = res?.data?.user;
             if (token) localStorage.setItem('rumi_token', token);
             if (user) localStorage.setItem('rumi_user', JSON.stringify(user));
             onLoginSuccess((email || '').trim() || 'user@example.com');
           } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || 'OTP verification failed.');
+            const msg = err?.response?.data?.message || err?.message || 'OTP verification failed.';
+            setError(msg);
+            throw err;
           } finally {
             setSubmitting(false);
           }
+        }}
+        onResend={async () => {
+          await sendOtp({ email: email.trim().toLowerCase() });
         }}
         onBack={() => setMode('otp-request')}
       />

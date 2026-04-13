@@ -35,6 +35,8 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String },
     otpCode: { type: String },
     otpExpiresAt: { type: Date },
+    passwordResetOtp: { type: String },
+    passwordResetOtpExpiresAt: { type: Date },
 
     // Profile (lifestyle-based)
     name: { type: String, trim: true, default: '' },

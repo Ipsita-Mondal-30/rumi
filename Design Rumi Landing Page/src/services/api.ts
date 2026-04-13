@@ -12,6 +12,13 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  const skipAuth = (config as { skipAuth?: boolean }).skipAuth;
+  if (skipAuth) {
+    if (config.headers && 'Authorization' in config.headers) {
+      delete config.headers.Authorization;
+    }
+    return config;
+  }
   const token = localStorage.getItem('rumi_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
@@ -29,8 +36,8 @@ export async function getReceivedAcceptedRequests() {
   return api.get('/request/received/accepted');
 }
 
-export async function getSentRequests() {
-  return api.get('/request/sent');
+export async function getSentRequests(params?: { roomId?: string }) {
+  return api.get('/request/sent', { params: params || {} });
 }
 
 export async function sendRequest(toUserId: string) {
@@ -49,25 +56,39 @@ export async function rejectRequest(data: any) {
   return api.post('/request/reject', data);
 }
 
-// Auth
+// Auth — skipAuth avoids sending a stale Bearer token (can break reset/login on some setups)
 export async function register(data: any) {
-  return api.post('/auth/register', data);
+  return api.post('/auth/register', data, { skipAuth: true } as { skipAuth: boolean });
 }
 
 export async function login(data: any) {
-  return api.post('/auth/login', data);
+  return api.post('/auth/login', data, { skipAuth: true } as { skipAuth: boolean });
 }
 
 export async function sendOtp(data: any) {
-  return api.post('/auth/otp/send', data);
+  return api.post('/auth/otp/send', data, { skipAuth: true } as { skipAuth: boolean });
 }
 
 export async function verifyOtp(data: any) {
-  return api.post('/auth/otp/verify', data);
+  return api.post('/auth/otp/verify', data, { skipAuth: true } as { skipAuth: boolean });
 }
 
-export async function getChatHistory(otherUserId: string) {
-  return api.get('/chat/history', { params: { userId: otherUserId } });
+export async function requestPasswordReset(data: { email: string }) {
+  return api.post('/auth/password-reset/request', data, { skipAuth: true } as { skipAuth: boolean });
+}
+
+export async function verifyPasswordResetCode(data: { email: string; code: string }) {
+  return api.post('/auth/password-reset/verify-code', data, { skipAuth: true } as { skipAuth: boolean });
+}
+
+export async function confirmPasswordReset(data: { resetToken: string; newPassword: string }) {
+  return api.post('/auth/password-reset/confirm', data, { skipAuth: true } as { skipAuth: boolean });
+}
+
+export async function getChatHistory(otherUserId: string, roomId?: string | null) {
+  const params: Record<string, string> = { userId: otherUserId };
+  if (roomId) params.roomId = roomId;
+  return api.get('/chat/history', { params });
 }
 
 // Assistant (Gemini)

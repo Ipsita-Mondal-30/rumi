@@ -1,6 +1,11 @@
 import bcrypt from 'bcrypt';
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
-import { signToken } from '../middleware/authMiddleware.js';
+import {
+  signToken,
+  signPasswordResetToken,
+  verifyPasswordResetToken,
+} from '../middleware/authMiddleware.js';
 
 const SALT_ROUNDS = 10;
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 min
@@ -60,7 +65,13 @@ export async function login(req, res) {
       return res.status(400).json({ success: false, message: 'Email and password required.' });
     }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const emailNorm = email.trim().toLowerCase();
+    let user = await User.findOne({ email: emailNorm });
+    // Legacy docs may have mixed-case email before schema lowercase enforcement
+    if (!user && email.trim()) {
+      const safe = emailNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      user = await User.findOne({ email: new RegExp(`^${safe}$`, 'i') });
+    }
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
@@ -158,6 +169,168 @@ export async function verifyOtp(req, res) {
     });
   } catch (err) {
     console.error('verifyOtp error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error.' });
+  }
+}
+
+function normalizeIdentifier(identifier) {
+  return (identifier || '').trim();
+}
+
+async function findUserByEmailOrPhone(identifier) {
+  const raw = normalizeIdentifier(identifier);
+  if (!raw) return null;
+  if (raw.includes('@')) {
+    return User.findOne({ email: raw.toLowerCase() });
+  }
+  return User.findOne({ phone: raw });
+}
+
+/**
+ * POST /auth/password-reset/request
+ * Body: { email } — email or phone matching User.phone
+ */
+export async function requestPasswordReset(req, res) {
+  try {
+    let { email } = req.body || {};
+    email = normalizeIdentifier(email);
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email or phone is required.' });
+    }
+
+    const user = await findUserByEmailOrPhone(email);
+    if (!user || !user.passwordHash) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with that email or phone, or password sign-in is not enabled.',
+      });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          passwordResetOtp: code,
+          passwordResetOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+        },
+      }
+    );
+
+    console.log(`[password-reset] OTP for ${user.email}: ${code}`);
+
+    return res.json({
+      success: true,
+      message:
+        'Reset code sent. (Demo: your 6-digit code is printed in the server console; use email delivery in production.)',
+      expiresIn: OTP_EXPIRY_MS / 1000,
+    });
+  } catch (err) {
+    console.error('requestPasswordReset error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error.' });
+  }
+}
+
+/**
+ * POST /auth/password-reset/verify-code
+ * Body: { email, code } — identifier must match request step (email or phone)
+ */
+export async function verifyPasswordResetCode(req, res) {
+  try {
+    let { email, code } = req.body || {};
+    email = normalizeIdentifier(email);
+    code = (code || '').trim();
+    if (!email || !code) {
+      return res.status(400).json({ success: false, message: 'Email or phone and code are required.' });
+    }
+
+    const user = await findUserByEmailOrPhone(email);
+    if (!user || !user.passwordHash) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const fresh = await User.findById(user._id).select(
+      'passwordResetOtp passwordResetOtpExpiresAt'
+    );
+    if (!fresh?.passwordResetOtp || fresh.passwordResetOtp !== code) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset code.' });
+    }
+    if (!fresh.passwordResetOtpExpiresAt || fresh.passwordResetOtpExpiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset code.' });
+    }
+
+    await User.updateOne(
+      { _id: user._id },
+      { $unset: { passwordResetOtp: 1, passwordResetOtpExpiresAt: 1 } }
+    );
+
+    const resetToken = signPasswordResetToken(user._id);
+    return res.json({
+      success: true,
+      message: 'Code verified. Choose a new password.',
+      resetToken,
+    });
+  } catch (err) {
+    console.error('verifyPasswordResetCode error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error.' });
+  }
+}
+
+/**
+ * POST /auth/password-reset/confirm
+ * Body: { resetToken, newPassword }
+ */
+export async function confirmPasswordReset(req, res) {
+  try {
+    const { resetToken, newPassword } = req.body || {};
+    if (!resetToken?.trim()) {
+      return res.status(400).json({ success: false, message: 'Reset token is required.' });
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters.',
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = verifyPasswordResetToken(resetToken.trim());
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset session.' });
+    }
+
+    const userId = String(decoded.userId || '');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid reset session.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: { passwordHash } },
+      { new: true }
+    );
+
+    if (!user?.passwordHash) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const hashOk = await bcrypt.compare(newPassword, user.passwordHash);
+    if (!hashOk) {
+      console.error('confirmPasswordReset: stored hash does not verify for user', userId);
+      return res.status(500).json({
+        success: false,
+        message: 'Could not save new password. Try again or request a new reset code.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password updated. You can sign in with your new password.',
+    });
+  } catch (err) {
+    console.error('confirmPasswordReset error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Server error.' });
   }
 }

@@ -61,3 +61,20 @@ export function optionalAuth(req, res, next) {
 export function signToken(userId) {
   return jwt.sign({ userId: userId.toString() }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 }
+
+/** Short-lived JWT used only after OTP verification, before setting a new password. */
+export function signPasswordResetToken(userId) {
+  return jwt.sign(
+    { userId: userId.toString(), purpose: 'password_reset' },
+    JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+}
+
+export function verifyPasswordResetToken(token) {
+  const decoded = jwt.verify(token, JWT_SECRET);
+  if (decoded.purpose !== 'password_reset' || !decoded.userId) {
+    throw new Error('Invalid reset token.');
+  }
+  return decoded;
+}

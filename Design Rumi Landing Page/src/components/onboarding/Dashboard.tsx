@@ -8,6 +8,7 @@ import {
   Settings, 
   LogOut, 
   Bell, 
+  ChevronLeft,
   ChevronDown,
   TrendingUp,
   Users,
@@ -23,7 +24,9 @@ import {
   Send,
   Clock,
   Check,
-  XCircle
+  XCircle,
+  PenLine,
+  Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -48,6 +51,7 @@ import {
   getRecommendedRooms,
 } from '../../services/api';
 import { API_BASE_URL } from '../../services/api';
+import { getChatSocket } from '../../services/chatSocket';
 import { RecommendedRoomsSection } from '../explore/RecommendedRoomsSection';
 import { RoomDetailsModal } from '../explore/RoomDetailsModal';
 import { OfferRoomDashboard } from '../offer/OfferRoomDashboard';
@@ -56,6 +60,65 @@ interface DashboardProps {
   onLogout: () => void;
   userEmail?: string;
   onEditProfile?: () => void;
+}
+
+/** Normalize search input for case-insensitive substring match. */
+function normalizeSearchQuery(q: string) {
+  return q.trim().toLowerCase();
+}
+
+/** Build a single lowercase string from lifestyle prefs for search (e.g. "veg", "night_owl"). */
+function lifestylePreferencesSearchText(prefs: Record<string, unknown> | undefined) {
+  if (!prefs || typeof prefs !== 'object') return '';
+  return Object.entries(prefs)
+    .map(([k, v]) => `${k} ${v ?? ''}`)
+    .join(' ')
+    .toLowerCase();
+}
+
+function discoverCardMatchesSearch(card: any, qLower: string) {
+  if (!qLower) return true;
+  const pref = (card.preferenceText as string) || '';
+  const tagStr = (card.tags || []).join(' ').toLowerCase();
+  const haystack = [
+    card.name,
+    card.bio,
+    card.city,
+    card.state,
+    card.profession,
+    card.gender,
+    card.intent,
+    tagStr,
+    pref,
+    String(card.match ?? ''),
+    String(card.budget ?? ''),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(qLower);
+}
+
+function roomMatchesSearch(room: any, qLower: string) {
+  if (!qLower) return true;
+  const loc = room?.location || {};
+  const tagStr = (Array.isArray(room?.tags) ? room.tags : []).join(' ').toLowerCase();
+  const haystack = [
+    loc.area,
+    loc.city,
+    loc.state,
+    loc.address,
+    loc.pincode,
+    room?.propertyType,
+    room?.roomDescription,
+    tagStr,
+    String(room?.monthlyRent ?? ''),
+    String(room?.compatibility ?? room?.matchScore ?? ''),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(qLower);
 }
 
 export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps) => {
@@ -74,8 +137,16 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   const [sending, setSending] = useState(false);
 
   const [chatWithUserId, setChatWithUserId] = useState(null);
+  const [chatRoomId, setChatRoomId] = useState(null as string | null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatListSearch, setChatListSearch] = useState('');
+  const [chatListFilter, setChatListFilter] = useState('all' as 'all' | 'listing' | 'direct');
+  const [inboxPreviews, setInboxPreviews] = useState(
+    {} as Record<string, { preview: string; time: string }>
+  );
 
   const [avatarSrc, setAvatarSrc] = useState('');
   const [isExploreLocked, setIsExploreLocked] = useState(false);
@@ -88,6 +159,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
   const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
   const [roomDetailsRoom, setRoomDetailsRoom] = useState(null);
+  const [dashboardSearch, setDashboardSearch] = useState('');
 
   const normalizeImageUrl = (src?: string | null) => {
     if (!src) return '';
@@ -97,14 +169,99 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     return `${API_BASE_URL}/${str}`;
   };
 
-  const avgMatchScore = useMemo(() => {
-    if (!swipeCards.length) return 0;
-    const total = swipeCards.reduce((s, c) => s + (Number(c.match) || 0), 0);
-    return Math.round(total / swipeCards.length);
-  }, [swipeCards]);
+  const filteredSwipeCards = useMemo(() => {
+    const q = normalizeSearchQuery(dashboardSearch);
+    if (!q) return swipeCards;
+    return swipeCards.filter((c: any) => discoverCardMatchesSearch(c, q));
+  }, [swipeCards, dashboardSearch]);
 
-  const nearbyMatchesCount = swipeCards.length;
+  const filteredRecommendedRooms = useMemo(() => {
+    const q = normalizeSearchQuery(dashboardSearch);
+    if (!q) return recommendedRooms;
+    return recommendedRooms.filter((r: any) => roomMatchesSearch(r, q));
+  }, [recommendedRooms, dashboardSearch]);
+
+  const avgMatchScore = useMemo(() => {
+    if (!filteredSwipeCards.length) return 0;
+    const total = filteredSwipeCards.reduce((s, c) => s + (Number(c.match) || 0), 0);
+    return Math.round(total / filteredSwipeCards.length);
+  }, [filteredSwipeCards]);
+
+  const nearbyMatchesCount = filteredSwipeCards.length;
   const lifestyleMatchScore = avgMatchScore;
+
+  const selectedChatMatch = useMemo(() => {
+    if (!chatWithUserId) return null;
+    const uid = String(chatWithUserId);
+    const rid = chatRoomId ? String(chatRoomId) : '';
+    const exact = (activeMatches as any[]).find(
+      (m) => String(m.userId) === uid && String(m.roomId || '') === rid
+    );
+    if (exact) return exact;
+    return (activeMatches as any[]).find((m) => String(m.userId) === uid) || null;
+  }, [activeMatches, chatWithUserId, chatRoomId]);
+
+  const filteredChatMatches = useMemo(() => {
+    const list = activeMatches as any[];
+    const q = chatListSearch.trim().toLowerCase();
+    let out = list.filter((m) => !q || String(m.name || '').toLowerCase().includes(q));
+    if (chatListFilter === 'listing') out = out.filter((m) => m.roomId);
+    if (chatListFilter === 'direct') out = out.filter((m) => !m.roomId);
+    return out;
+  }, [activeMatches, chatListSearch, chatListFilter]);
+
+  useEffect(() => {
+    if (activeNav !== 'messages') return;
+    const matches = activeMatches as any[];
+    if (!matches.length) {
+      setInboxPreviews({});
+      return;
+    }
+    if (!localStorage.getItem('rumi_token')) return;
+
+    let cancelled = false;
+    (async () => {
+      const pairs = await Promise.all(
+        matches.map(async (m) => {
+          const key = `${m.userId}-${m.roomId || 'explore'}`;
+          try {
+            const res = await getChatHistory(String(m.userId), m.roomId || null);
+            const msgs = res?.data?.messages || [];
+            const last = msgs.length ? msgs[msgs.length - 1] : null;
+            if (!last) {
+              return [
+                key,
+                {
+                  preview: m.roomId
+                    ? 'Listing · start the conversation'
+                    : `${m.match ?? 0}% match`,
+                  time: '',
+                },
+              ] as const;
+            }
+            const time = last.timestamp
+              ? new Date(last.timestamp).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })
+              : '';
+            const snippet = String(last.message || '').replace(/\s+/g, ' ').trim();
+            const short = snippet.length > 42 ? `${snippet.slice(0, 42)}…` : snippet;
+            const preview = last.isOwn ? `You: ${short}` : short;
+            return [key, { preview, time }] as const;
+          } catch {
+            return [key, { preview: 'Tap to open chat', time: '' }] as const;
+          }
+        })
+      );
+      if (!cancelled) {
+        setInboxPreviews(Object.fromEntries(pairs) as Record<string, { preview: string; time: string }>);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeNav, activeMatches]);
 
   useEffect(() => {
     if (userEmail) {
@@ -170,6 +327,9 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
         const baseTags = deriveTags(u, m.reasons || []);
         const hasRoom = u?.intent === 'offer';
         const tags = hasRoom ? ['Has a room', ...baseTags].slice(0, 4) : baseTags;
+        const city =
+          [u?.city, u?.location?.city].filter(Boolean).join(' ').trim() || '';
+        const state = u?.location?.state || '';
         return {
           id: u._id,
           userId: u._id,
@@ -181,11 +341,26 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           tags,
           hasRoom,
           budget: budgetDisplay,
+          city,
+          state,
+          profession: u?.profession || '',
+          gender: u?.gender || '',
+          intent: u?.intent || '',
+          preferenceText: lifestylePreferencesSearchText(u?.lifestylePreferences),
         };
       });
 
       const mappedReceived = received.map((r: any) => {
         const u = r.fromUserId || {};
+        const rid = r.roomId?._id || r.roomId;
+        const ridStr = rid ? String(rid) : null;
+        const rm = r.roomId && typeof r.roomId === 'object' ? r.roomId : null;
+        const roomLabel =
+          rm?.propertyType || rm?.location?.city
+            ? [rm?.propertyType, rm?.location?.city].filter(Boolean).join(' · ')
+            : ridStr
+              ? 'Room invite'
+              : null;
         return {
           id: r._id,
           name: u.name,
@@ -194,11 +369,15 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           match: r.matchScore ?? r.match ?? 0,
           userId: u._id,
           requestId: r._id,
+          roomId: ridStr,
+          roomLabel,
         };
       });
 
       const mappedSent = sent.map((r: any) => {
         const u = r.toUserId || {};
+        const rid = r.roomId?._id || r.roomId;
+        const ridStr = rid ? String(rid) : null;
         return {
           id: r._id,
           name: u.name,
@@ -208,24 +387,39 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           status: r.status,
           userId: u._id,
           requestId: r._id,
+          roomId: ridStr,
         };
       });
 
-      // Active matches = accepted connections regardless of direction
+      // Active matches = accepted connections (explore + per-listing room threads)
       const activeMap = new Map<string, any>();
 
       mappedSent
         .filter((r: any) => r.status === 'accepted')
-        .forEach((r: any) => activeMap.set(r.userId, r));
+        .forEach((r: any) => {
+          const key = r.roomId ? `${r.userId}:${r.roomId}` : String(r.userId);
+          activeMap.set(key, {
+            id: r.id,
+            name: r.name,
+            match: r.match,
+            image: r.image,
+            userId: r.userId,
+            roomId: r.roomId,
+          });
+        });
 
       receivedAccepted.forEach((r: any) => {
         const u = r.fromUserId || {};
-        activeMap.set(u._id, {
+        const rid = r.roomId?._id || r.roomId;
+        const ridStr = rid ? String(rid) : null;
+        const key = ridStr ? `${u._id}:${ridStr}` : String(u._id);
+        activeMap.set(key, {
           id: r._id,
           name: u.name,
           match: r.matchScore ?? r.match ?? 0,
           image: u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop',
           userId: u._id,
+          roomId: ridStr,
         });
       });
 
@@ -357,7 +551,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     const run = async () => {
       setChatLoading(true);
       try {
-        const res = await getChatHistory(chatWithUserId);
+        const res = await getChatHistory(chatWithUserId, chatRoomId);
         setChatMessages(res?.data?.messages || []);
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -369,10 +563,54 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     };
 
     run();
-  }, [activeNav, chatWithUserId]);
+  }, [activeNav, chatWithUserId, chatRoomId]);
+
+  useEffect(() => {
+    if (activeNav !== 'messages' || !chatWithUserId) return;
+    const s = getChatSocket();
+    if (!s) return;
+
+    let meId = '';
+    try {
+      meId = JSON.parse(localStorage.getItem('rumi_user') || '{}')?._id || '';
+    } catch {
+      return;
+    }
+
+    const onIncoming = (payload: any) => {
+      const other = String(chatWithUserId);
+      const a = String(payload.senderId ?? '');
+      const b = String(payload.receiverId ?? '');
+      const pairOk =
+        (a === meId && b === other) || (a === other && b === meId);
+      if (!pairOk) return;
+      const pRoom = payload.roomId ? String(payload.roomId) : '';
+      const cRoom = chatRoomId ? String(chatRoomId) : '';
+      if (pRoom !== cRoom) return;
+
+      setChatMessages((prev) => {
+        if (prev.some((m: any) => String(m._id) === String(payload._id))) return prev;
+        return [
+          ...prev,
+          {
+            _id: payload._id,
+            message: payload.message,
+            senderId: { _id: a, name: '' },
+            isOwn: a === meId,
+            timestamp: payload.timestamp,
+          },
+        ];
+      });
+    };
+
+    s.on('message', onIncoming);
+    return () => {
+      s.off('message', onIncoming);
+    };
+  }, [activeNav, chatWithUserId, chatRoomId]);
 
   const handleSwipe = async (direction: 'left' | 'right') => {
-    const top = swipeCards[0];
+    const top = filteredSwipeCards[0];
     if (!top || sending) return;
     setSending(true);
     try {
@@ -388,6 +626,37 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSendChat = async () => {
+    const text = chatDraft.trim();
+    if (!text || !chatWithUserId || chatSending) return;
+    const sock = getChatSocket();
+    if (!sock) return;
+    if (!sock.connected) sock.connect();
+
+    setChatSending(true);
+    const payload: { receiverId: string; message: string; roomId?: string } = {
+      receiverId: String(chatWithUserId),
+      message: text,
+    };
+    if (chatRoomId) payload.roomId = String(chatRoomId);
+
+    const failSafe = window.setTimeout(() => setChatSending(false), 12000);
+    const onSent = async () => {
+      window.clearTimeout(failSafe);
+      sock.off('message_sent', onSent);
+      setChatDraft('');
+      setChatSending(false);
+      try {
+        const res = await getChatHistory(String(chatWithUserId), chatRoomId);
+        setChatMessages(res?.data?.messages || []);
+      } catch {
+        // ignore
+      }
+    };
+    sock.once('message_sent', onSent);
+    sock.emit('message', payload);
   };
 
   const quickActions = [
@@ -465,7 +734,13 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           </button>
 
           <button
-            onClick={() => setActiveNav('messages')}
+            onClick={() => {
+              setActiveNav('messages');
+              setChatWithUserId(null);
+              setChatRoomId(null);
+              setChatMessages([]);
+              setChatDraft('');
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-colors ${
               activeNav === 'messages'
                 ? 'bg-blue-600 text-white'
@@ -535,22 +810,29 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto flex flex-col min-h-0">
         {/* Top Navigation Bar */}
         <header className="bg-white shadow-sm px-8 py-4 sticky top-0 z-10">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {activeNav === 'messages' ? 'Messages' : 'Dashboard'}
+            </h1>
 
             <div className="flex items-center gap-4">
               {/* Search */}
+              {activeNav !== 'messages' && (
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                  type="text"
+                  type="search"
+                  value={dashboardSearch}
+                  onChange={(e) => setDashboardSearch(e.target.value)}
                   placeholder="Search matches, locations, preferences"
+                  autoComplete="off"
                   className="pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
                 />
               </div>
+              )}
 
               {/* Icons */}
               <button className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors relative">
@@ -602,12 +884,261 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
         </header>
 
         {/* Dashboard Content */}
-        <div className="p-8">
-          {showLoginNotice && userEmail && (
+        <div
+          className={
+            activeNav === 'messages'
+              ? 'p-3 md:p-6 flex-1 flex flex-col min-h-0'
+              : 'p-8'
+          }
+        >
+          {showLoginNotice && userEmail && activeNav !== 'messages' && (
             <div className="mb-6 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-emerald-800 text-sm">
               Logged in as <span className="font-semibold">{userEmail}</span>
             </div>
           )}
+
+          {activeNav === 'messages' ? (
+            <div className="flex rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex-1 min-h-[480px] md:min-h-[calc(100vh-9.5rem)] max-h-[calc(100vh-9.5rem)]">
+              {/* Chat list — light WhatsApp-style desktop */}
+              <aside
+                className={`flex flex-col w-full md:w-[min(100%,400px)] md:max-w-[400px] flex-shrink-0 bg-white border-r border-gray-200 ${
+                  chatWithUserId ? 'hidden md:flex' : 'flex'
+                }`}
+              >
+                <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
+                  <h2 className="text-xl font-bold text-gray-900 tracking-tight">Chats</h2>
+                  <button
+                    type="button"
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+                    aria-label="Compose"
+                    title="New message"
+                  >
+                    <PenLine size={20} strokeWidth={2} />
+                  </button>
+                </div>
+
+                <div className="px-3 py-2 bg-white border-b border-gray-100">
+                  <div className="relative">
+                    <Search
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      type="search"
+                      value={chatListSearch}
+                      onChange={(e) => setChatListSearch(e.target.value)}
+                      placeholder="Search chats"
+                      className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-100 border-0 text-sm text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-gray-200 focus:bg-white outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 px-3 py-2 bg-white border-b border-gray-100 flex-wrap">
+                  {(
+                    [
+                      { id: 'all' as const, label: 'All' },
+                      { id: 'listing' as const, label: 'Listings' },
+                      { id: 'direct' as const, label: 'Direct' },
+                    ]
+                  ).map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setChatListFilter(id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        chatListFilter === id
+                          ? 'bg-gray-200 text-gray-900'
+                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-white">
+                  {(activeMatches as any[]).length === 0 ? (
+                    <div className="p-8 text-center">
+                      <MessageCircle className="mx-auto mb-3 text-gray-200" size={44} strokeWidth={1.25} />
+                      <p className="text-sm font-medium text-gray-700">No conversations yet</p>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                        Accept a match from the dashboard to start chatting.
+                      </p>
+                    </div>
+                  ) : filteredChatMatches.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-gray-500">No chats match your search.</div>
+                  ) : (
+                    filteredChatMatches.map((match: any) => {
+                      const rowKey = `${match.userId}-${match.roomId || 'explore'}`;
+                      const isActive =
+                        chatWithUserId &&
+                        String(chatWithUserId) === String(match.userId) &&
+                        String(chatRoomId || '') === String(match.roomId || '');
+                      const imgSrc = match.image
+                        ? normalizeImageUrl(match.image)
+                        : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop';
+                      const meta = inboxPreviews[rowKey];
+                      return (
+                        <button
+                          key={rowKey}
+                          type="button"
+                          onClick={() => {
+                            setChatWithUserId(match.userId ?? match.id);
+                            setChatRoomId(match.roomId ? String(match.roomId) : null);
+                          }}
+                          className={`w-full flex items-start gap-3 px-4 py-3 text-left border-b border-gray-100 transition-colors ${
+                            isActive ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          <img
+                            src={imgSrc}
+                            alt=""
+                            className="w-12 h-12 rounded-full object-cover bg-gray-100 flex-shrink-0 ring-1 ring-gray-100"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="font-semibold text-gray-900 text-[15px] truncate">
+                                {match.name}
+                              </p>
+                              {meta?.time ? (
+                                <span className="text-[11px] text-gray-400 flex-shrink-0 tabular-nums">
+                                  {meta.time}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-[13px] text-gray-500 truncate mt-0.5 leading-snug">
+                              {meta?.preview ||
+                                (match.roomId
+                                  ? 'Listing conversation'
+                                  : `${match.match ?? 0}% match`)}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </aside>
+
+              {/* Conversation pane — white / soft gray */}
+              <section
+                className={`flex flex-col flex-1 min-w-0 bg-[#f8fafc] ${
+                  chatWithUserId ? 'flex' : 'hidden md:flex'
+                }`}
+              >
+                {!chatWithUserId ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12 bg-[#fafbfc]">
+                    <div className="w-[120px] h-[120px] rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm mb-6">
+                      <MessageCircle
+                        className="text-[#25D366]"
+                        size={56}
+                        strokeWidth={1.15}
+                      />
+                    </div>
+                    <p className="text-[26px] font-light text-gray-800 tracking-tight">
+                      Rumi Messenger
+                    </p>
+                    <p className="text-sm text-gray-500 mt-3 max-w-sm leading-relaxed">
+                      Select a chat from your list to view messages and reply. Your sidebar stays available for the rest of Rumi.
+                    </p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-[#25D366] mt-12 font-medium">
+                      <Lock size={12} strokeWidth={2.5} aria-hidden />
+                      Messages are private between you and your matches.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                      <button
+                        type="button"
+                        className="md:hidden p-2 rounded-full hover:bg-gray-100 text-gray-700 -ml-1"
+                        aria-label="Back to chats"
+                        onClick={() => {
+                          setChatWithUserId(null);
+                          setChatRoomId(null);
+                          setChatMessages([]);
+                          setChatDraft('');
+                        }}
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                      <img
+                        src={
+                          selectedChatMatch?.image
+                            ? normalizeImageUrl(selectedChatMatch.image)
+                            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
+                        }
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover ring-1 ring-gray-100"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 truncate text-[15px]">
+                          {selectedChatMatch?.name || 'Chat'}
+                        </p>
+                        {selectedChatMatch?.roomId ? (
+                          <p className="text-xs text-gray-500 truncate">Listing conversation</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 truncate">Direct message</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 min-h-0 bg-[#f0f4f8]">
+                      {chatLoading ? (
+                        <p className="text-sm text-gray-500 text-center py-8">Loading messages…</p>
+                      ) : chatMessages.length ? (
+                        chatMessages.map((m: any) => (
+                          <div
+                            key={m._id}
+                            className={`flex ${m.isOwn ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[78%] px-3 py-2 rounded-lg text-[14px] leading-snug shadow-sm border ${
+                                m.isOwn
+                                  ? 'bg-[#d9fdd3] text-gray-900 border-[#b8e8bc] rounded-br-sm'
+                                  : 'bg-white text-gray-900 border-gray-200/80 rounded-bl-sm'
+                              }`}
+                            >
+                              <div className="whitespace-pre-wrap break-words">{m.message}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                          <p className="text-sm text-gray-500">No messages yet</p>
+                          <p className="text-xs text-gray-400 mt-1">Send a message below to say hello</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-white border-t border-gray-200 flex gap-2 shrink-0">
+                      <input
+                        value={chatDraft}
+                        onChange={(e) => setChatDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            void handleSendChat();
+                          }
+                        }}
+                        disabled={chatSending}
+                        placeholder="Type a message…"
+                        className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSendChat()}
+                        disabled={chatSending || !chatDraft.trim()}
+                        className="px-6 py-2.5 rounded-full bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20bd5a] disabled:opacity-45 disabled:cursor-not-allowed transition-colors shadow-sm"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Column - Discover Matches (2/3 width) */}
             <div className="lg:col-span-2">
@@ -639,14 +1170,14 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                             <Users size={64} className="mx-auto mb-4 opacity-50" />
                             <p className="text-lg">Loading matches…</p>
                           </div>
-                        ) : swipeCards.length > 0 ? (
-                          swipeCards.map((card, index) => (
+                        ) : filteredSwipeCards.length > 0 ? (
+                          filteredSwipeCards.map((card, index) => (
                             index < 3 && (
                               <motion.div
                                 key={card.id}
                                 className="absolute w-full max-w-md"
                                 style={{
-                                  zIndex: swipeCards.length - index,
+                                  zIndex: filteredSwipeCards.length - index,
                                 }}
                                 initial={
                                   index === 0
@@ -680,6 +1211,12 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-1">
                                       {card.name}, {card.age}
                                     </h3>
+                                    {(card.city || card.state) ? (
+                                      <p className="text-sm text-gray-500 flex items-center gap-1 mb-2">
+                                        <MapPin size={14} className="shrink-0" />
+                                        {[card.city, card.state].filter(Boolean).join(', ')}
+                                      </p>
+                                    ) : null}
                                     <p className="text-gray-600 mb-4 leading-relaxed">
                                       {card.bio}
                                     </p>
@@ -728,6 +1265,14 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                               </motion.div>
                             )
                           ))
+                        ) : swipeCards.length > 0 ? (
+                          <div className="text-center text-gray-400 max-w-md px-4">
+                            <Users size={64} className="mx-auto mb-4 opacity-50" />
+                            <p className="text-lg text-gray-700">No profiles match your search</p>
+                            <p className="text-sm mt-2">
+                              Try another city, preference (e.g. non-smoker, night owl), or name.
+                            </p>
+                          </div>
                         ) : (
                           <div className="text-center text-gray-400">
                             <Users size={64} className="mx-auto mb-4 opacity-50" />
@@ -740,7 +1285,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   )}
 
                 {/* Action Buttons */}
-                {(!isExploreLocked || revealExploreMatches) && !showExploreProfileModal && swipeCards.length > 0 && (
+                {(!isExploreLocked || revealExploreMatches) && !showExploreProfileModal && filteredSwipeCards.length > 0 && (
                   <div className="flex items-center justify-center gap-6 mt-8">
                     <button
                       onClick={() => handleSwipe('left')}
@@ -760,8 +1305,16 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                 )}
 
                 {/* Recommended Rooms */}
+                {normalizeSearchQuery(dashboardSearch) &&
+                  recommendedRooms.length > 0 &&
+                  filteredRecommendedRooms.length === 0 &&
+                  !roomsLoading && (
+                    <p className="mt-6 text-sm text-gray-500">
+                      No recommended rooms match “{dashboardSearch.trim()}”. Try a different area or keyword.
+                    </p>
+                  )}
                 <RecommendedRoomsSection
-                  rooms={recommendedRooms}
+                  rooms={filteredRecommendedRooms}
                   loading={roomsLoading}
                   title="Recommended Rooms"
                 />
@@ -770,67 +1323,6 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
             {/* Right Column - Side Widgets */}
             <div className="space-y-6">
-              {/* Messages (activeTab) */}
-              {activeNav === 'messages' && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4 mb-4">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <MessageCircle size={20} className="text-blue-600" />
-                      Messages
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveNav('dashboard');
-                        setChatWithUserId(null);
-                        setChatMessages([]);
-                      }}
-                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
-                    >
-                    Back
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 max-h-[320px] overflow-auto pr-2">
-                    {chatLoading ? (
-                      <p className="text-sm text-gray-500">Loading messages...</p>
-                    ) : chatWithUserId ? (
-                      chatMessages.length ? (
-                        chatMessages.map((m) => (
-                          <div
-                            key={m._id}
-                            className={`flex ${m.isOwn ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                                m.isOwn ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
-                              }`}
-                            >
-                              <div className="font-medium mb-1 text-xs opacity-90">
-                                {m.isOwn ? 'You' : m.senderId?.name || 'User'}
-                              </div>
-                              <div className="whitespace-pre-wrap">{m.message}</div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-gray-500">No messages yet.</p>
-                      )
-                    ) : (
-                      <p className="text-sm text-gray-500">Select an active match to view messages.</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4">
-                    <input
-                      disabled
-                      value="Messaging sending is not enabled in this design build."
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500"
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Requests Received */}
               {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -854,6 +1346,9 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                           <p className="text-xs text-emerald-600 font-medium">
                             {request.match}% Match
                           </p>
+                          {request.roomLabel ? (
+                            <p className="text-xs text-blue-600 font-medium mt-1">{request.roomLabel}</p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -942,7 +1437,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                 </h3>
                 <div className="space-y-3">
                   {activeMatches.map((match) => (
-                    <div key={match.id} className="flex items-center gap-3">
+                    <div
+                      key={`${match.userId}-${match.roomId || 'explore'}`}
+                      className="flex items-center gap-3"
+                    >
                       <img
                         src={match.image}
                         alt={match.name}
@@ -953,11 +1451,15 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                           {match.name}
                         </p>
                         <p className="text-xs text-emerald-600 font-medium">{match.match}% Match</p>
+                        {match.roomId ? (
+                          <p className="text-[10px] text-gray-500 mt-0.5">Listing chat</p>
+                        ) : null}
                       </div>
                       <button
                         type="button"
                         onClick={() => {
                           setChatWithUserId(match.userId ?? match.id);
+                          setChatRoomId(match.roomId ? String(match.roomId) : null);
                           setActiveNav('messages');
                         }}
                         className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white hover:bg-blue-700 transition-colors"
@@ -1048,6 +1550,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
               )}
             </div>
           </div>
+          )}
         </div>
       </main>
 

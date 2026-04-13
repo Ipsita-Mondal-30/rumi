@@ -39,7 +39,7 @@ export const SignupScreen = ({ onNext, onLogin, initialEmail }: SignupProps) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim();
+    const trimmed = email.trim().toLowerCase();
     setError('');
 
     if (!agreed) return;
