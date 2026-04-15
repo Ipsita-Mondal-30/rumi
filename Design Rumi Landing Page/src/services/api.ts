@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL
   ? (import.meta.env.VITE_API_URL.startsWith('http')
@@ -90,10 +90,24 @@ export async function getChatHistory(otherUserId: string, roomId?: string | null
   if (roomId) params.roomId = roomId;
   return api.get('/chat/history', { params });
 }
+// Assistant (Gemini RAG)
+// Types for RAG API
+export interface RagRequest {
+  message: string;
+}
 
-// Assistant (Gemini)
-export async function sendAssistantMessage(payload: any) {
-  return api.post('/assistant/chat', payload);
+export interface RagResponse {
+  reply: string;
+  error?: string;
+}
+
+export async function sendRagMessage(payload: RagRequest): Promise<AxiosResponse<RagResponse>> {
+  return api.post<RagResponse>('/api/rag/chat', payload);
+}
+
+// Backwards-compatible alias for older callers
+export async function sendAssistantMessage(payload: RagRequest): Promise<AxiosResponse<RagResponse>> {
+  return sendRagMessage(payload);
 }
 
 // Profile

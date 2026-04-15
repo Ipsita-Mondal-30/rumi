@@ -16,6 +16,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import assistantRoutes from './routes/assistantRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
+import ragRoutes from './routes/ragRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // `.env` is expected to be inside this folder (`backend/.env`).
@@ -39,6 +40,9 @@ app.use('/chat', chatRoutes);
 app.use('/assistant', assistantRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/report', reportRoutes);
+// RAG (Retrieval-Augmented Generation) endpoints used by the frontend
+// Frontend expects /api/rag/chat, so register under /api/rag
+app.use('/api/rag', ragRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 

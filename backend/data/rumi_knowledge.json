@@ -1,0 +1,212 @@
+[
+  {
+    "id": "match-01",
+    "question": "How does Rumi match roommates?",
+    "answer": "Rumi uses a smart matching algorithm that analyzes your lifestyle preferences (like sleeping habits, cleanliness, and smoking), budget range, and location to calculate a compatibility score with other users. You can see this score as a percentage on every profile.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "match-02",
+    "question": "What factors does the matching algorithm consider?",
+    "answer": "Our algorithm considers core factors: Location preferences, Budget (min/max), Food habits (Veg/Non-Veg), Social habits (Quiet/Party), and Cleanliness levels. It prioritizes users who share similar daily routines to ensure long-term compatibility.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "match-03",
+    "question": "Can I filter roommates by city?",
+    "answer": "Yes, you can filter matches by major Indian cities like Delhi, Mumbai, Bangalore, Pune, and Hyderabad. On your dashboard, use the city selection dropdown to view only those users looking for a flat or roommate in your preferred area.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "match-04",
+    "question": "How do I optimize my Rumi profile for better matches?",
+    "answer": "To get better matches, fill out your bio section in detail. Mention your work/study schedule and hobbies. Upload at least 2 clear photos. Profiles with a complete 'Lifestyle preferences' section get 3x more match requests.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "match-05",
+    "question": "What if I can't find a match in my budget?",
+    "answer": "If your budget is tight, try expanding your location search to nearby suburbs. In cities like Mumbai or Bangalore, living 5-10km away from central hubs can significantly lower your rent. Also, consider a 'shared room' instead of a private one.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "safety-01",
+    "question": "Is it safe to share my phone number on Rumi?",
+    "answer": "We recommend using Rumi's in-app chat for initial conversations. Only share your phone number once you feel comfortable and have verified the match's identity. Never share your OTP or banking details with anyone on the platform.",
+    "category": "safety",
+    "city": "general"
+  },
+  {
+    "id": "safety-02",
+    "question": "What should I do if a match makes me uncomfortable?",
+    "answer": "If a user is being inappropriate, aggressive, or suspicious, use the 'Report' button on their profile immediately. Our moderation team reviews all reports within 24 hours and takes strict action, including permanent bans.",
+    "category": "safety",
+    "city": "general"
+  },
+  {
+    "id": "safety-03",
+    "question": "How does Rumi verify users?",
+    "answer": "Rumi offers an optional verification badge for users who provide government-issued IDs. We also verify email addresses and phone numbers during signup. Look for the blue 'Verified' tick on profiles for added safety.",
+    "category": "safety",
+    "city": "general"
+  },
+  {
+    "id": "safety-04",
+    "question": "Tips for meeting a potential roommate for the first time.",
+    "answer": "Always meet in a public place (like a cafe or mall) for the first time. Tell a friend or family member where you are going. If you are visiting a flat, try to take a friend along and only visit during daylight hours.",
+    "category": "safety",
+    "city": "general"
+  },
+  {
+    "id": "safety-05",
+    "question": "Reporting a scam or fake profile.",
+    "answer": "If you see a profile using celebrity photos, asking for 'booking amounts' before a visit, or offering deals that seem too good to be true, please report them. Rumi never asks for payment on behalf of roommates.",
+    "category": "safety",
+    "city": "general"
+  },
+  {
+    "id": "india-01",
+    "question": "How to discuss food preferences (Veg vs Non-Veg) in India?",
+    "answer": "In India, kitchen sharing is a major factor. Be clear if you require a 'Pure Veg' kitchen or if you are okay with 'Non-Veg' being cooked in shared utensils. Mention if you have allergies or specific dietary restrictions like Jain food preferences.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "india-02",
+    "question": "Managing electricity bills and AC usage in shared flats.",
+    "answer": "Electricity bills in Indian summers can be high due to ACs. We recommend installing sub-meters if possible, or agreeing to split the bill based on individual AC usage hours. Always discuss the base split (1/N) for fans, lights, and fridges.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "india-03",
+    "question": "Rules about late-night entries and visitors in Indian PGs/Flats.",
+    "answer": "Many PGs and housing societies in India have 'gate timings' (e.g., 11 PM). Discuss these with your roommate early. If you are in an independent flat, align with your roommate on guest policies—especially regarding overnight stays and party noise.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "india-04",
+    "question": "Dealing with regional language barriers in shared living.",
+    "answer": "India is diverse. While English or Hindi are common, your roommate might prefer a regional language. Be patient and use translation apps if needed. Often, sharing a meal is the best way to break the ice across cultural and language barriers.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "india-05",
+    "question": "Managing house help (maid/cook) salary and timing.",
+    "answer": "Agree on the hiring and salary split for maids or cooks. In most Indian cities, housework is shared. Decide who will coordinate with the help, keep track of their leaves, and ensure payments are made on time every month.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "guide-01",
+    "question": "General house rules for Rumi users.",
+    "answer": "Respect each other's privacy, maintain cleanliness in common areas, and always ask before using your roommate's items. Communication is key—use a shared WhatsApp group or 'House Rules' list to avoid misunderstandings.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "guide-02",
+    "question": "Respecting personal space in a shared room.",
+    "answer": "If you share a bedroom, establish 'Quiet Hours' for sleep and work. Use headphones for music or calls at night. Avoid bringing guests into the shared room without checking with your roommate first.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "guide-03",
+    "question": "Handling noise complaints from neighbors.",
+    "answer": "In Indian apartment complexes, neighbors can be sensitive to noise. Keep music volume low after 10 PM. If you're having a small gathering, inform your immediate neighbors in advance to maintain good relations.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "guide-04",
+    "question": "Policy on smoking and alcohol in shared spaces.",
+    "answer": "Be 100% honest about smoking or drinking habits in your profile. If you are a smoker, agree on designated areas (like a balcony). Respect your roommate's choice if they prefer a 'no alcohol/no smoking' environment.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "guide-05",
+    "question": "Sharing common appliances like washing machines and fridges.",
+    "answer": "Set a schedule for using the washing machine. In the fridge, designate shelves for each person to avoid confusion. Label your containers if needed, especially if you have similar food items.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "faq-01",
+    "question": "Is Rumi free to use?",
+    "answer": "Rumi offers a free basic version where you can browse matches. We also have 'Pro' features that allow you to see who viewed your profile, unlock unlimited match requests, and get priority visibility in search results.",
+    "category": "FAQ",
+    "city": "general"
+  },
+  {
+    "id": "faq-02",
+    "question": "How do I delete my Rumi account?",
+    "answer": "To delete your account, go to Profile Settings > Privacy > Delete Account. This action is permanent and will remove all your data, matches, and messages from our servers.",
+    "category": "FAQ",
+    "city": "general"
+  },
+  {
+    "id": "faq-03",
+    "question": "Can I list my own room on Rumi?",
+    "answer": "Yes! If you already have a flat and are looking for a roommate to fill a vacant room, select 'I have a room' during profile setup. You can then upload photos of the space and set the rent details.",
+    "category": "FAQ",
+    "city": "general"
+  },
+  {
+    "id": "faq-04",
+    "question": "What is the 'Rumi Match Score'?",
+    "answer": "The Match Score is a percentage representing how well you align with another user. A score above 80% usually indicates excellent lifestyle compatibility, while 50-70% means you might need to discuss some differences.",
+    "category": "FAQ",
+    "city": "general"
+  },
+  {
+    "id": "faq-05",
+    "question": "How do I edit my lifestyle preferences?",
+    "answer": "Go to 'Edit Profile' and select 'Lifestyle Preferences'. You can update your choices for food, pets, smoking, and social habits at any time. Updating these will immediately recalculate your match scores with others.",
+    "category": "FAQ",
+    "city": "general"
+  },
+  {
+    "id": "comm-01",
+    "question": "How to start a conversation with a match?",
+    "answer": "Start with a friendly greeting and mention something from their profile. Example: 'Hi! I saw you're also a designer looking for a flat in Indiranagar. I love your bio! Are you still looking?' Personal messages get better response rates.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "comm-02",
+    "question": "Discussing deposit and rent split clearly.",
+    "answer": "Always discuss the security deposit (usually 2-10 months in India) and specific rent due dates. Be clear if the rent includes maintenance, water bills, or internet charges. Get these agreements in writing if possible.",
+    "category": "matching tips",
+    "city": "general"
+  },
+  {
+    "id": "comm-03",
+    "question": "Dealing with disagreements about chores.",
+    "answer": "Create a simple cleaning chart or use an app to track chores. If a disagreement arises, talk it out calmly instead of leaving passive-aggressive notes. Most issues are caused by different 'cleanliness standards' which can be compromised on.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "comm-04",
+    "question": "Setting boundaries for overnight guests.",
+    "answer": "Discuss guest policies before moving in. Is it okay for friends/partners to stay over? For how many nights? Agree on a 'heads-up' period (e.g., inform 24 hours in advance) so your roommate isn't surprised by a stranger.",
+    "category": "guidelines",
+    "city": "general"
+  },
+  {
+    "id": "comm-05",
+    "question": "How to gracefully decline a match.",
+    "answer": "If you don't find a match compatible, it's better to be honest than to ghost them. A simple 'Hey, thanks for reaching out, but I think our lifestyle preferences might be too different. Good luck with your search!' is polite and effective.",
+    "category": "matching tips",
+    "city": "general"
+  }
+]

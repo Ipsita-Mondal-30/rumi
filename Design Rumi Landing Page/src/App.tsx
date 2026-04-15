@@ -9,7 +9,7 @@ import { VerificationSuccessScreen } from './components/onboarding/VerificationS
 import { ProfileSetupFlow } from './components/onboarding/ProfileSetupFlow';
 import { FinalConfirmationScreen } from './components/onboarding/FinalConfirmationScreen';
 import { Dashboard } from './components/onboarding/Dashboard';
-import { getProfile, sendAssistantMessage } from './services/api';
+import { getProfile, sendRagMessage } from './services/api';
 
 // Font injection for Poppins
 
@@ -1173,50 +1173,69 @@ const TrustSafetySection = () => {
 
 /* --- CHATBOT COMPONENT --- */
 
-const Chatbot = () => {
-  const [isOpen, setIsOpen] = useState(false);
+interface Message {
+  id: number;
+  text: string;
+  sender: 'user' | 'bot';
+}
+
+function Chatbot() {
+  const [isOpen, setIsOpen] = useState(false as boolean);
   const [messages, setMessages] = useState([
     { id: 1, text: "Hi! I'm Rumi's AI assistant. How can I help you find your perfect flatmate today?", sender: 'bot' }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isAssistantTyping, setIsAssistantTyping] = useState(false);
+  ] as Message[]);
+  const [inputMessage, setInputMessage] = useState('' as string);
+  const [isAssistantTyping, setIsAssistantTyping] = useState(false as boolean);
 
-  const callAssistant = async (nextMessages: Array<{ id: number; text: string; sender: 'user' | 'bot' }>, typingMessageId: number) => {
-    const apiMessages = nextMessages
-      .filter((m) => m.sender === 'user' || m.sender === 'bot')
-      .map((m) => ({
-        role: m.sender === 'user' ? 'user' : 'assistant',
-        text: m.text,
-      }));
+  const callAssistant = async (nextMessages: Message[], typingMessageId: number): Promise<void> => {
+    // Get the last message from the user
+    const lastUserMessage = [...nextMessages].reverse().find(m => m.sender === 'user')?.text || '';
 
-    const res = await sendAssistantMessage({ messages: apiMessages });
-    const reply = res?.data?.reply ?? '';
+    // Debug logging
+    console.log("Sending query:", lastUserMessage);
 
-    setMessages((prev) => [
-      ...prev.filter((m) => m.id !== typingMessageId),
-      { id: typingMessageId, text: reply || 'Okay — tell me a bit more.', sender: 'bot' },
-    ]);
+    try {
+      const res = await sendRagMessage({ message: lastUserMessage });
+      // Debug logging response
+      console.log("Response:", res.data);
+
+      const reply = res?.data?.reply ?? '';
+
+      setMessages((prev: Message[]) => [
+        ...prev.filter((m) => m.id !== typingMessageId),
+        { id: typingMessageId, text: reply || 'Okay — tell me a bit more.', sender: 'bot' },
+      ]);
+    } catch (err: unknown) {
+      // Try to surface any helpful message returned by backend (even on 500)
+      console.error('RAG request failed:', err);
+      const e = err as any;
+      const backendReply: string | undefined = e?.response?.data?.reply ?? e?.response?.data?.message;
+
+      setMessages((prev: Message[]) => [
+        ...prev.filter((m) => m.id !== typingMessageId),
+        { id: typingMessageId, text: backendReply ?? 'Sorry — I could not generate a response. Please try again.', sender: 'bot' },
+      ]);
+    }
   };
 
-  const sendUserMessage = async (text: string) => {
+  const sendUserMessage = async (text: string): Promise<void> => {
     if (!text.trim()) return;
     if (isAssistantTyping) return;
 
     const userMessageId = Date.now();
-    const userMessage = { id: userMessageId, text: text.trim(), sender: 'user' as const };
+    const userMessage: Message = { id: userMessageId, text: text.trim(), sender: 'user' };
     const nextMessages = [...messages, userMessage];
 
     const typingMessageId = userMessageId + 1;
-    const typingMessage = { id: typingMessageId, text: 'Typing...', sender: 'bot' as const };
+    const typingMessage: Message = { id: typingMessageId, text: 'Typing...', sender: 'bot' };
 
     setMessages([...nextMessages, typingMessage]);
     setIsAssistantTyping(true);
     try {
       await callAssistant(nextMessages, typingMessageId);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('assistant chat error:', err);
-      setMessages((prev) => [
+      setMessages((prev: Message[]) => [
         ...prev.filter((m) => m.id !== typingMessageId),
         { id: typingMessageId, text: 'Sorry — I could not generate a response. Please try again.', sender: 'bot' },
       ]);
@@ -1225,7 +1244,7 @@ const Chatbot = () => {
     }
   };
 
-  const handleSendMessage = async (e: any) => {
+  const handleSendMessage = async (e: { preventDefault: () => void }): Promise<void> => {
     e.preventDefault();
     const text = inputMessage;
     setInputMessage('');
