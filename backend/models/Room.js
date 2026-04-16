@@ -14,6 +14,12 @@ const roomSchema = new mongoose.Schema(
       enum: ['active', 'paused', 'rented'],
       default: 'paused',
     },
+    /** Admin listing moderation (defaults to approved so legacy listings stay visible). */
+    moderationStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
     // Total profile views for this listing.
     viewsCount: { type: Number, default: 0, min: 0 },
 

@@ -32,8 +32,8 @@ export const RecommendedRoomCard = ({ room, onViewDetails }: RecommendedRoomCard
   const tags: string[] = Array.isArray(room?.tags) ? room.tags : [];
 
   return (
-    <div className="w-[220px] flex-shrink-0 border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm">
-      <div className="relative h-28 bg-slate-100">
+    <div className="w-full border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+      <div className="relative h-36 bg-slate-100">
         <img src={cover} alt={room?.propertyType || 'Room'} className="w-full h-full object-cover" />
         <div className="absolute top-3 left-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-[11px] font-semibold shadow">
           {score}% Match

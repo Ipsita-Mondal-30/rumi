@@ -33,6 +33,9 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     phone: { type: String, trim: true },
     passwordHash: { type: String },
+    authProvider: { type: String, enum: ['password', 'google'], default: 'password' },
+    googleSub: { type: String, index: true },
+    googlePicture: { type: String, default: null },
     otpCode: { type: String },
     otpExpiresAt: { type: Date },
     passwordResetOtp: { type: String },
@@ -73,6 +76,11 @@ const userSchema = new mongoose.Schema(
     trustScore: { type: Number, default: 0, min: 0, max: 100 },
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     profileCompleted: { type: Boolean, default: false },
+
+    /** Admin moderation: full account lock vs active. */
+    accountStatus: { type: String, enum: ['active', 'blocked'], default: 'active' },
+    /** Count of admin warnings from report handling. */
+    adminWarnings: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

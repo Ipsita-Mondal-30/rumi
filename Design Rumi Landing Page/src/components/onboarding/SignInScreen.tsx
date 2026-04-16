@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { AuthLayout } from './AuthLayout';
 import { OTPScreen } from './OTPScreen';
-import { login, sendOtp, verifyOtp } from '../../services/api';
+import { GoogleLogin } from '@react-oauth/google';
+import { googleLogin, login, sendOtp, verifyOtp } from '../../services/api';
 
 // Mock icons
 const GoogleIcon = () => (
@@ -10,15 +11,6 @@ const GoogleIcon = () => (
     <path
       fill="currentColor"
       d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81z"
-    />
-  </svg>
-);
-
-const AppleIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24">
-    <path
-      fill="currentColor"
-      d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.74s2.57-.9 4.35-.82c1.81.08 3.16.88 4.02 2.12-3.8 1.9-3.2 6.94.6 8.52-.36 1.1-1.28 3.07-2.67 4.54-.7.69-1.38 1.38-1.38 1.38zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"
     />
   </svg>
 );
@@ -114,15 +106,31 @@ export const SignInScreen = ({ onLoginSuccess, onForgotPassword, onSignup }: Sig
           </div>
         )}
         {mode === 'password' && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button type="button" className="flex items-center justify-center gap-2 py-2.5 px-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 font-medium text-sm">
-              <GoogleIcon />
-              <span>Google</span>
-            </button>
-            <button type="button" className="flex items-center justify-center gap-2 py-2.5 px-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 font-medium text-sm">
-              <AppleIcon />
-              <span>Apple</span>
-            </button>
+          <div className="grid grid-cols-1 gap-4 mb-6">
+            <div className="flex items-center justify-center py-2.5 px-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 font-medium text-sm">
+              <GoogleLogin
+                onSuccess={async (cred) => {
+                  try {
+                    setError('');
+                    setSubmitting(true);
+                    const credential = (cred as any)?.credential;
+                    if (!credential) throw new Error('Missing Google credential');
+                    const res = await googleLogin({ credential });
+                    const token = res?.data?.token;
+                    const user = res?.data?.user;
+                    if (token) localStorage.setItem('rumi_token', token);
+                    if (user) localStorage.setItem('rumi_user', JSON.stringify(user));
+                    onLoginSuccess(user?.email || email.trim());
+                  } catch (err: any) {
+                    setError(err?.response?.data?.message || err?.message || 'Google sign-in failed.');
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                onError={() => setError('Google sign-in failed.')}
+                useOneTap={false}
+              />
+            </div>
           </div>
         )}
 

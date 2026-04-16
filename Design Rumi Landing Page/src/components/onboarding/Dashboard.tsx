@@ -160,6 +160,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
   const [roomDetailsRoom, setRoomDetailsRoom] = useState(null);
   const [dashboardSearch, setDashboardSearch] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileUser, setProfileUser] = useState(null as any | null);
+  const [settingsEmailUpdates, setSettingsEmailUpdates] = useState(true);
+  const [settingsPushUpdates, setSettingsPushUpdates] = useState(true);
 
   const normalizeImageUrl = (src?: string | null) => {
     if (!src) return '';
@@ -167,6 +171,16 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     if (str.startsWith('http://') || str.startsWith('https://')) return str;
     if (str.startsWith('/')) return `${API_BASE_URL}${str}`;
     return `${API_BASE_URL}/${str}`;
+  };
+
+  const readStoredUserId = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('rumi_user') || '{}');
+      const id = u?._id ?? u?.id;
+      return id ? String(id) : '';
+    } catch {
+      return '';
+    }
   };
 
   const filteredSwipeCards = useMemo(() => {
@@ -190,15 +204,25 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   const nearbyMatchesCount = filteredSwipeCards.length;
   const lifestyleMatchScore = avgMatchScore;
 
+  const showFindRoomSideWidgets = useMemo(() => {
+    return (
+      activeNav !== 'messages' &&
+      activeNav !== 'matches' &&
+      activeNav !== 'profile' &&
+      activeNav !== 'settings'
+    );
+  }, [activeNav]);
+
   const selectedChatMatch = useMemo(() => {
     if (!chatWithUserId) return null;
     const uid = String(chatWithUserId);
     const rid = chatRoomId ? String(chatRoomId) : '';
+    const rowId = (m: any) => String(m.userId ?? m.id ?? m.user?._id ?? '').trim();
     const exact = (activeMatches as any[]).find(
-      (m) => String(m.userId) === uid && String(m.roomId || '') === rid
+      (m) => rowId(m) === uid && String(m.roomId || '') === rid
     );
     if (exact) return exact;
-    return (activeMatches as any[]).find((m) => String(m.userId) === uid) || null;
+    return (activeMatches as any[]).find((m) => rowId(m) === uid) || null;
   }, [activeMatches, chatWithUserId, chatRoomId]);
 
   const filteredChatMatches = useMemo(() => {
@@ -221,39 +245,43 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
     let cancelled = false;
     (async () => {
-      const pairs = await Promise.all(
-        matches.map(async (m) => {
-          const key = `${m.userId}-${m.roomId || 'explore'}`;
-          try {
-            const res = await getChatHistory(String(m.userId), m.roomId || null);
-            const msgs = res?.data?.messages || [];
-            const last = msgs.length ? msgs[msgs.length - 1] : null;
-            if (!last) {
-              return [
-                key,
-                {
-                  preview: m.roomId
-                    ? 'Listing · start the conversation'
-                    : `${m.match ?? 0}% match`,
-                  time: '',
-                },
-              ] as const;
+      const pairs = (
+        await Promise.all(
+          matches.map(async (m) => {
+            const oid = String(m.userId ?? m.id ?? m.user?._id ?? '').trim();
+            if (!oid) return null;
+            const key = `${oid}-${m.roomId || 'explore'}`;
+            try {
+              const res = await getChatHistory(oid, m.roomId || null);
+              const msgs = res?.data?.messages || [];
+              const last = msgs.length ? msgs[msgs.length - 1] : null;
+              if (!last) {
+                return [
+                  key,
+                  {
+                    preview: m.roomId
+                      ? 'Listing · start the conversation'
+                      : `${m.match ?? 0}% match`,
+                    time: '',
+                  },
+                ] as const;
+              }
+              const time = last.timestamp
+                ? new Date(last.timestamp).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                : '';
+              const snippet = String(last.message || '').replace(/\s+/g, ' ').trim();
+              const short = snippet.length > 42 ? `${snippet.slice(0, 42)}…` : snippet;
+              const preview = last.isOwn ? `You: ${short}` : short;
+              return [key, { preview, time }] as const;
+            } catch {
+              return [key, { preview: 'Tap to open chat', time: '' }] as const;
             }
-            const time = last.timestamp
-              ? new Date(last.timestamp).toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })
-              : '';
-            const snippet = String(last.message || '').replace(/\s+/g, ' ').trim();
-            const short = snippet.length > 42 ? `${snippet.slice(0, 42)}…` : snippet;
-            const preview = last.isOwn ? `You: ${short}` : short;
-            return [key, { preview, time }] as const;
-          } catch {
-            return [key, { preview: 'Tap to open chat', time: '' }] as const;
-          }
-        })
-      );
+          })
+        )
+      ).filter(Boolean) as Array<readonly [string, { preview: string; time: string }]>;
       if (!cancelled) {
         setInboxPreviews(Object.fromEntries(pairs) as Record<string, { preview: string; time: string }>);
       }
@@ -545,13 +573,34 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   }, []);
 
   useEffect(() => {
+    if (activeNav !== 'profile' && activeNav !== 'settings') return;
+    if (!localStorage.getItem('rumi_token')) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setProfileLoading(true);
+        const res = await getProfile();
+        const u = res?.data?.user || null;
+        if (!cancelled) setProfileUser(u);
+      } catch {
+        if (!cancelled) setProfileUser(null);
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeNav]);
+
+  useEffect(() => {
     if (activeNav !== 'messages') return;
     if (!chatWithUserId) return;
 
     const run = async () => {
       setChatLoading(true);
       try {
-        const res = await getChatHistory(chatWithUserId, chatRoomId);
+        const res = await getChatHistory(String(chatWithUserId), chatRoomId);
         setChatMessages(res?.data?.messages || []);
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -570,12 +619,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     const s = getChatSocket();
     if (!s) return;
 
-    let meId = '';
-    try {
-      meId = JSON.parse(localStorage.getItem('rumi_user') || '{}')?._id || '';
-    } catch {
-      return;
-    }
+    const meId = readStoredUserId();
+    if (!meId) return;
 
     const onIncoming = (payload: any) => {
       const other = String(chatWithUserId);
@@ -646,6 +691,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     const onSent = async () => {
       window.clearTimeout(failSafe);
       sock.off('message_sent', onSent);
+      sock.off('error', onSockErr);
       setChatDraft('');
       setChatSending(false);
       try {
@@ -655,7 +701,16 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
         // ignore
       }
     };
+    const onSockErr = (err: any) => {
+      window.clearTimeout(failSafe);
+      sock.off('message_sent', onSent);
+      sock.off('error', onSockErr);
+      setChatSending(false);
+      // eslint-disable-next-line no-console
+      console.error('chat socket error:', err);
+    };
     sock.once('message_sent', onSent);
+    sock.once('error', onSockErr);
     sock.emit('message', payload);
   };
 
@@ -815,12 +870,24 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
         <header className="bg-white shadow-sm px-8 py-4 sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold text-gray-900">
-              {activeNav === 'messages' ? 'Messages' : 'Dashboard'}
+              {activeNav === 'messages'
+                ? 'Messages'
+                : activeNav === 'discover'
+                  ? 'Discover Matches'
+                  : activeNav === 'matches'
+                    ? 'My Matches'
+                    : activeNav === 'activity'
+                      ? 'Activity & Stats'
+                      : activeNav === 'profile'
+                        ? 'Profile'
+                        : activeNav === 'settings'
+                          ? 'Settings'
+                          : 'Dashboard'}
             </h1>
 
             <div className="flex items-center gap-4">
               {/* Search */}
-              {activeNav !== 'messages' && (
+              {activeNav !== 'messages' && activeNav !== 'settings' && (
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -969,10 +1036,12 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                     <div className="p-8 text-center text-sm text-gray-500">No chats match your search.</div>
                   ) : (
                     filteredChatMatches.map((match: any) => {
-                      const rowKey = `${match.userId}-${match.roomId || 'explore'}`;
+                      const otherId = String(match.userId ?? match.id ?? match.user?._id ?? '').trim();
+                      if (!otherId) return null;
+                      const rowKey = `${otherId}-${match.roomId || 'explore'}`;
                       const isActive =
                         chatWithUserId &&
-                        String(chatWithUserId) === String(match.userId) &&
+                        String(chatWithUserId) === otherId &&
                         String(chatRoomId || '') === String(match.roomId || '');
                       const imgSrc = match.image
                         ? normalizeImageUrl(match.image)
@@ -983,7 +1052,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                           key={rowKey}
                           type="button"
                           onClick={() => {
-                            setChatWithUserId(match.userId ?? match.id);
+                            setChatWithUserId(otherId);
                             setChatRoomId(match.roomId ? String(match.roomId) : null);
                           }}
                           className={`w-full flex items-start gap-3 px-4 py-3 text-left border-b border-gray-100 transition-colors ${
@@ -1139,27 +1208,298 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
               </section>
             </div>
           ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Column - Discover Matches (2/3 width) */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-3xl p-8 shadow-sm">
-                <div className="mb-6">
-                  {isExploreLocked && !revealExploreMatches ? (
-                    <>
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-1">
-                        Here are rooms you might like
-                      </h2>
-                      <p className="text-gray-500">
-                        Complete your profile to unlock matching.
-                      </p>
-                    </>
+          <>
+            {activeNav === 'matches' ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Your matches</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      These are accepted connections. Tap to message in real time.
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-500">{activeMatches.length} total</div>
+                </div>
+
+                <div className="p-4">
+                  {(activeMatches as any[]).length === 0 ? (
+                    <div className="py-12 text-center">
+                      <Heart className="mx-auto mb-3 text-gray-200" size={44} strokeWidth={1.25} />
+                      <p className="text-sm font-medium text-gray-700">No matches yet</p>
+                      <p className="text-xs text-gray-500 mt-1">Accept a request to unlock chat.</p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('discover')}
+                        className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                      >
+                        <Search size={16} /> Discover matches
+                      </button>
+                    </div>
                   ) : (
-                    <>
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-1">Discover Matches</h2>
-                      <p className="text-gray-500">Swipe right to connect, left to pass.</p>
-                    </>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {(filteredChatMatches as any[]).map((m) => {
+                        const imgSrc = m.image
+                          ? normalizeImageUrl(m.image)
+                          : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop';
+                        const key = `${m.userId}-${m.roomId || 'explore'}`;
+                        const meta = inboxPreviews[key];
+                        return (
+                          <div
+                            key={key}
+                            className="border border-gray-100 rounded-2xl bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-start gap-3">
+                              <img
+                                src={imgSrc}
+                                alt=""
+                                className="w-12 h-12 rounded-full object-cover bg-gray-100 ring-1 ring-gray-100 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-gray-900 truncate">{m.name}</p>
+                                  <span className="text-[11px] px-2 py-1 rounded-full bg-gray-50 text-gray-600 border border-gray-100">
+                                    {m.roomId ? 'Listing' : 'Direct'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                                  {meta?.preview ||
+                                    (m.roomId ? 'Listing · start the conversation' : `${m.match ?? 0}% match`)}
+                                </p>
+                                <div className="mt-3 flex items-center justify-between gap-3">
+                                  <span className="text-xs font-semibold text-emerald-600">
+                                    {m.match ?? 0}% match
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setChatWithUserId(m.userId ?? m.id);
+                                      setChatRoomId(m.roomId ? String(m.roomId) : null);
+                                      setChatMessages([]);
+                                      setChatDraft('');
+                                      setActiveNav('messages');
+                                    }}
+                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                  >
+                                    <MessageCircle size={16} /> Message
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
+              </div>
+            ) : activeNav === 'profile' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Your profile</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Keep your details up to date for better matches.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onEditProfile?.()}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      <Edit size={16} /> Edit profile
+                    </button>
+                  </div>
+
+                  <div className="p-6">
+                    {profileLoading ? (
+                      <div className="text-sm text-gray-500">Loading profile…</div>
+                    ) : (
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={
+                            avatarSrc ||
+                            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80'
+                          }
+                          alt=""
+                          className="w-16 h-16 rounded-2xl object-cover bg-gray-100 ring-1 ring-gray-100"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-lg font-semibold text-gray-900 truncate">
+                            {profileUser?.name || 'Your name'}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {profileUser?.email || userEmail || 'Signed in'}
+                          </p>
+                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                              <p className="text-xs text-gray-500">City</p>
+                              <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {profileUser?.city || profileUser?.location?.city || '—'}
+                              </p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                              <p className="text-xs text-gray-500">Profession</p>
+                              <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {profileUser?.profession || '—'}
+                              </p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                              <p className="text-xs text-gray-500">Intent</p>
+                              <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {profileUser?.intent || '—'}
+                              </p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                              <p className="text-xs text-gray-500">Profile status</p>
+                              <p className="text-sm font-semibold text-gray-900 mt-1">
+                                {profileUser?.profileCompleted ? 'Completed' : 'Incomplete'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 className="font-semibold text-gray-900 mb-2">Quick actions</h3>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('messages')}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-gray-700">Open messages</span>
+                        <MessageCircle size={18} className="text-gray-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('discover')}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-gray-700">Discover matches</span>
+                        <Search size={18} className="text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : activeNav === 'settings' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+                    <p className="text-sm text-gray-500 mt-1">Manage notifications and account.</p>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    <div className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                      <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                      <div className="mt-4 space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => setSettingsEmailUpdates((v) => !v)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-gray-100 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-gray-900">Email updates</p>
+                            <p className="text-xs text-gray-500">Match alerts and account updates</p>
+                          </div>
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              settingsEmailUpdates ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {settingsEmailUpdates ? 'On' : 'Off'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSettingsPushUpdates((v) => !v)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-gray-100 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-gray-900">In-app notifications</p>
+                            <p className="text-xs text-gray-500">New messages and requests</p>
+                          </div>
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              settingsPushUpdates ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {settingsPushUpdates ? 'On' : 'Off'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                      <p className="text-sm font-semibold text-gray-900">Account</p>
+                      <div className="mt-3 text-sm text-gray-600">
+                        Signed in as <span className="font-semibold text-gray-900">{profileUser?.email || userEmail || '—'}</span>
+                      </div>
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={onLogout}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-100 hover:bg-red-100 transition-colors text-sm font-semibold"
+                        >
+                          <LogOut size={16} /> Logout
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 className="font-semibold text-gray-900 mb-2">Shortcuts</h3>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('profile')}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-gray-700">Profile</span>
+                        <User size={18} className="text-gray-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('messages')}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-gray-700">Messages</span>
+                        <MessageCircle size={18} className="text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Column - Discover Matches (2/3 width) */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-3xl p-8 shadow-sm">
+                    <div className="mb-6">
+                      {isExploreLocked && !revealExploreMatches ? (
+                        <>
+                          <h2 className="text-2xl font-semibold text-gray-900 mb-1">
+                            Here are rooms you might like
+                          </h2>
+                          <p className="text-gray-500">
+                            Complete your profile to unlock matching.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="text-2xl font-semibold text-gray-900 mb-1">Discover Matches</h2>
+                          <p className="text-gray-500">Swipe right to connect, left to pass.</p>
+                        </>
+                      )}
+                    </div>
 
                 {/* Swipe Card Stack */}
                   {(!isExploreLocked || revealExploreMatches) && (
@@ -1321,10 +1661,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
               </div>
             </div>
 
-            {/* Right Column - Side Widgets */}
+            {/* Right Column - Side Widgets (Find a Room / Discover only) */}
+            {showFindRoomSideWidgets && (
             <div className="space-y-6">
               {/* Requests Received */}
-              {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Heart size={20} className="text-blue-600" />
@@ -1389,10 +1729,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   ))}
                 </div>
               </div>
-              )}
 
               {/* Sent Requests */}
-              {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Send size={20} className="text-blue-600" />
@@ -1426,10 +1764,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   ))}
                 </div>
               </div>
-              )}
 
               {/* Active Matches */}
-              {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Users size={20} className="text-blue-600" />
@@ -1470,10 +1806,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   ))}
                 </div>
               </div>
-              )}
 
               {/* Quick Actions */}
-              {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-2">
@@ -1497,10 +1831,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   })}
                 </div>
               </div>
-              )}
 
               {/* Compatibility Insights */}
-              {activeNav !== 'messages' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Target size={20} className="text-blue-600" />
@@ -1547,9 +1879,11 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   </div>
                 </div>
               </div>
-              )}
             </div>
+            )}
           </div>
+          )}
+          </>
           )}
         </div>
       </main>

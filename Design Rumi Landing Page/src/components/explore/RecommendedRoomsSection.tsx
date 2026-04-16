@@ -27,26 +27,36 @@ export const RecommendedRoomsSection = ({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-10 text-gray-500">
-          <Users size={36} className="mr-3" />
-          Loading rooms…
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm"
+            >
+              <div className="h-36 bg-slate-100 animate-pulse" />
+              <div className="p-3 space-y-2">
+                <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+                <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+                <div className="h-5 w-1/3 bg-slate-100 rounded animate-pulse" />
+                <div className="h-9 w-full bg-slate-100 rounded-xl animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : rooms.length === 0 ? (
         <div className="text-sm text-gray-500">No recommended rooms found.</div>
       ) : (
-        <div className="overflow-x-auto pb-2">
-          <div className="flex gap-4">
-            {rooms.map((room) => (
-              <RecommendedRoomCard
-                key={room._id}
-                room={room}
-                onViewDetails={(r) => {
-                  setSelectedRoom(r);
-                  setOpen(true);
-                }}
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {rooms.map((room) => (
+            <RecommendedRoomCard
+              key={room._id}
+              room={room}
+              onViewDetails={(r) => {
+                setSelectedRoom(r);
+                setOpen(true);
+              }}
+            />
+          ))}
         </div>
       )}
 

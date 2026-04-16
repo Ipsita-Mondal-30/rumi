@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
+  ChevronLeft,
   Edit,
   Home,
   MessageCircle,
@@ -65,7 +66,6 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
 
   const [actionSending, setActionSending] = useState(false);
 
-  const [chatOpen, setChatOpen] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [activeOtherUserId, setActiveOtherUserId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -85,6 +85,16 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
     if (str.startsWith('http://') || str.startsWith('https://')) return str;
     if (str.startsWith('/')) return `${API_BASE_URL}${str}`;
     return `${API_BASE_URL}/${str}`;
+  };
+
+  const readStoredUserId = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('rumi_user') || '{}');
+      const id = u?._id ?? u?.id;
+      return id ? String(id) : '';
+    } catch {
+      return '';
+    }
   };
 
   const selectedRoom = useMemo(() => {
@@ -205,8 +215,8 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
 
   const openChat = async (otherUserId: string) => {
     if (!selectedRoomId) return;
-    setChatOpen(true);
-    setActiveOtherUserId(otherUserId);
+    setActiveNav('messages');
+    setActiveOtherUserId(String(otherUserId));
     setChatLoading(true);
     setChatMessages([]);
     try {
@@ -273,6 +283,7 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
     const onSent = async () => {
       window.clearTimeout(failSafe);
       sock.off('message_sent', onSent);
+      sock.off('error', onSockErr);
       setRoomChatDraft('');
       setRoomChatSending(false);
       try {
@@ -284,7 +295,16 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
         // ignore
       }
     };
+    const onSockErr = (err: unknown) => {
+      window.clearTimeout(failSafe);
+      sock.off('message_sent', onSent);
+      sock.off('error', onSockErr);
+      setRoomChatSending(false);
+      // eslint-disable-next-line no-console
+      console.error('room chat socket error:', err);
+    };
     sock.once('message_sent', onSent);
+    sock.once('error', onSockErr);
     sock.emit('message', {
       receiverId: activeOtherUserId,
       message: text,
@@ -293,15 +313,11 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
   };
 
   useEffect(() => {
-    if (!chatOpen || !activeOtherUserId || !selectedRoomId) return;
+    if (activeNav !== 'messages' || !activeOtherUserId || !selectedRoomId) return;
     const s = getChatSocket();
     if (!s) return;
-    let meId = '';
-    try {
-      meId = JSON.parse(localStorage.getItem('rumi_user') || '{}')?._id || '';
-    } catch {
-      return;
-    }
+    const meId = readStoredUserId();
+    if (!meId) return;
     const roomId = String(selectedRoomId);
     const other = String(activeOtherUserId);
     const onIncoming = (payload: any) => {
@@ -330,7 +346,7 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
     return () => {
       s.off('message', onIncoming);
     };
-  }, [chatOpen, activeOtherUserId, selectedRoomId]);
+  }, [activeNav, activeOtherUserId, selectedRoomId]);
 
   const handleTogglePause = async (roomId: string) => {
     setActionSending(true);
@@ -389,8 +405,10 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
       label: 'Open Messages',
       icon: MessageCircle,
       onClick: () => {
-        if (chatThreads.length > 0) openChat(String(chatThreads[0].otherUserId));
-        else chatsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setActiveNav('messages');
+        setActiveOtherUserId(null);
+        setChatMessages([]);
+        if (chatThreads.length > 0) void openChat(String(chatThreads[0].otherUserId));
       },
     },
   ];
@@ -448,7 +466,11 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
           </button>
 
           <button
-            onClick={() => setActiveNav('messages')}
+            onClick={() => {
+              setActiveNav('messages');
+              setActiveOtherUserId(null);
+              setChatMessages([]);
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-colors ${
               activeNav === 'messages' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
             }`}
@@ -502,7 +524,19 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
       <main className="flex-1 overflow-auto">
         <header className="bg-white shadow-sm px-8 py-4 sticky top-0 z-10">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {activeNav === 'messages'
+                ? 'Messages'
+                : activeNav === 'requests'
+                  ? 'Requests'
+                  : activeNav === 'listings'
+                    ? 'My Listings'
+                    : activeNav === 'profile'
+                      ? 'Profile'
+                      : activeNav === 'settings'
+                        ? 'Settings'
+                        : 'Dashboard'}
+            </h1>
 
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -555,6 +589,186 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
         </header>
 
         <div className="p-8">
+          {activeNav === 'messages' ? (
+            <div className="flex rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden min-h-[520px] max-h-[calc(100vh-8.5rem)]">
+              <aside
+                className={`flex flex-col w-full md:w-[min(100%,400px)] md:max-w-[400px] shrink-0 bg-white border-r border-gray-200 ${
+                  activeOtherUserId ? 'hidden md:flex' : 'flex'
+                }`}
+              >
+                <div className="p-4 border-b border-gray-200">
+                  <label className="text-xs font-medium text-gray-500">Listing</label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white disabled:opacity-60"
+                    disabled={listings.length === 0}
+                    value={selectedRoomId || ''}
+                    onChange={(e) => {
+                      const v = e.target.value || null;
+                      setSelectedRoomId(v);
+                      setActiveOtherUserId(null);
+                      setChatMessages([]);
+                    }}
+                  >
+                    {listings.length === 0 ? (
+                      <option value="">Add a listing first</option>
+                    ) : (
+                      listings.map((r) => (
+                        <option key={String(r._id)} value={String(r._id)}>
+                          {(r.propertyType || 'Room') + ` · ₹${r.monthlyRent ?? 0}/mo`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Chats</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">Accepted invites for this listing</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-white">
+                  {!selectedRoomId ? (
+                    <div className="p-4 text-sm text-gray-500">Select a listing to see chats.</div>
+                  ) : threadsLoading ? (
+                    <div className="p-4 text-sm text-gray-500">Loading chats…</div>
+                  ) : chatThreads.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-600">
+                      No chats yet. When someone accepts your invite (or you accept their request), they’ll appear here.
+                    </div>
+                  ) : (
+                    chatThreads.map((t) => {
+                      const active = String(activeOtherUserId) === String(t.otherUserId);
+                      return (
+                        <button
+                          key={String(t.otherUserId)}
+                          type="button"
+                          onClick={() => void openChat(String(t.otherUserId))}
+                          className={`w-full text-left px-4 py-3 border-b border-gray-100 transition-colors ${
+                            active ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <img
+                              src={
+                                t.image ||
+                                'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
+                              }
+                              alt=""
+                              className="w-11 h-11 rounded-full object-cover bg-slate-100 ring-1 ring-gray-100 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{t.name || 'User'}</p>
+                                {Number(t.unreadCount ?? 0) > 0 ? (
+                                  <span className="text-[10px] font-bold text-white bg-blue-600 rounded-full px-2 py-0.5">
+                                    {t.unreadCount}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-xs text-gray-500 truncate mt-0.5">
+                                {t.lastMessagePreview || 'No messages yet.'}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </aside>
+
+              <section
+                className={`flex flex-col flex-1 min-w-0 bg-[#f8fafc] ${
+                  activeOtherUserId ? 'flex' : 'hidden md:flex'
+                }`}
+              >
+                {!activeOtherUserId ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12">
+                    <MessageCircle className="text-blue-500 mb-4" size={48} strokeWidth={1.15} />
+                    <p className="text-lg font-semibold text-gray-900">Listing messages</p>
+                    <p className="text-sm text-gray-500 mt-2 max-w-sm">
+                      Pick a person on the left to open the thread. Messages use the same real-time connection as Find a Room.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                      <button
+                        type="button"
+                        className="md:hidden p-2 rounded-full hover:bg-gray-100 text-gray-700 -ml-1"
+                        aria-label="Back to chats"
+                        onClick={() => {
+                          setActiveOtherUserId(null);
+                          setChatMessages([]);
+                          setRoomChatDraft('');
+                        }}
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {chatThreads.find((x) => String(x.otherUserId) === String(activeOtherUserId))?.name ||
+                            'Chat'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">Room chat · listing</p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 min-h-0 bg-[#f0f4f8]">
+                      {chatLoading ? (
+                        <p className="text-sm text-gray-500 text-center py-8">Loading messages…</p>
+                      ) : chatMessages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                          <p className="text-sm text-gray-500">No messages yet</p>
+                          <p className="text-xs text-gray-400 mt-1">Send a message below to start the conversation</p>
+                        </div>
+                      ) : (
+                        chatMessages.map((m) => (
+                          <div key={m._id} className={`flex ${m.isOwn ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                              className={`max-w-[78%] px-3 py-2 rounded-lg text-[14px] leading-snug shadow-sm border ${
+                                m.isOwn
+                                  ? 'bg-[#d9fdd3] text-gray-900 border-[#b8e8bc] rounded-br-sm'
+                                  : 'bg-white text-gray-900 border-gray-200/80 rounded-bl-sm'
+                              }`}
+                            >
+                              <div className="whitespace-pre-wrap break-words">{m.message}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-white border-t border-gray-200 flex gap-2 shrink-0">
+                      <input
+                        value={roomChatDraft}
+                        onChange={(e) => setRoomChatDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            void sendRoomChatMessage();
+                          }
+                        }}
+                        disabled={roomChatSending}
+                        placeholder="Type a message…"
+                        className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void sendRoomChatMessage()}
+                        disabled={roomChatSending || !roomChatDraft.trim()}
+                        className="px-6 py-2.5 rounded-full bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20bd5a] disabled:opacity-45 disabled:cursor-not-allowed transition-colors shadow-sm"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-3xl p-8 shadow-sm">
@@ -878,6 +1092,7 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
               </div>
             </div>
           </div>
+          )}
         </div>
       </main>
 
@@ -898,83 +1113,6 @@ export const OfferRoomDashboard = ({ onLogout, userEmail, onEditProfile }: Dashb
         }}
       />
 
-      {/* Chat modal */}
-      {chatOpen && selectedRoomId && activeOtherUserId && (
-        <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-white rounded-3xl shadow-xl overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Chat with {chatThreads.find((t) => String(t.otherUserId) === String(activeOtherUserId))?.name || 'User'}
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Room chat</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setChatOpen(false);
-                  setChatMessages([]);
-                  setActiveOtherUserId(null);
-                  setRoomChatDraft('');
-                }}
-                className="w-10 h-10 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center"
-              >
-                <span className="text-gray-600">×</span>
-              </button>
-            </div>
-
-            <div className="p-6 max-h-[60vh] overflow-auto space-y-3">
-              {chatLoading ? (
-                <div className="text-sm text-gray-500">Loading messages...</div>
-              ) : chatMessages.length === 0 ? (
-                <div className="text-sm text-gray-500">No messages yet.</div>
-              ) : (
-                chatMessages.map((m) => (
-                  <div
-                    key={m._id}
-                    className={`flex ${m.isOwn ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                        m.isOwn ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
-                      }`}
-                    >
-                      <div className="font-medium mb-1 text-xs opacity-90">
-                        {m.isOwn ? 'You' : m.senderId?.name || 'User'}
-                      </div>
-                      <div className="whitespace-pre-wrap">{m.message}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="p-6 border-t border-gray-100 flex gap-2">
-              <input
-                value={roomChatDraft}
-                onChange={(e) => setRoomChatDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void sendRoomChatMessage();
-                  }
-                }}
-                disabled={roomChatSending}
-                placeholder="Type a message…"
-                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 disabled:bg-gray-50"
-              />
-              <button
-                type="button"
-                onClick={() => void sendRoomChatMessage()}
-                disabled={roomChatSending || !roomChatDraft.trim()}
-                className="px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
+import { OAuth2Client } from 'google-auth-library';
 import {
   signToken,
   signPasswordResetToken,
@@ -74,6 +75,12 @@ export async function login(req, res) {
     }
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+    if (user.accountStatus === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been suspended. Contact support if you believe this is a mistake.',
+      });
     }
     if (!user.passwordHash) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
@@ -332,5 +339,88 @@ export async function confirmPasswordReset(req, res) {
   } catch (err) {
     console.error('confirmPasswordReset error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Server error.' });
+  }
+}
+
+/**
+ * POST /auth/google
+ * Body: { credential } where credential is a Google ID token (JWT).
+ */
+export async function googleAuth(req, res) {
+  try {
+    const { credential } = req.body || {};
+    if (!credential || typeof credential !== 'string') {
+      return res.status(400).json({ success: false, message: 'Google credential is required.' });
+    }
+
+    const audience = process.env.GOOGLE_CLIENT_ID;
+    if (!audience) {
+      return res.status(500).json({
+        success: false,
+        message: 'Server is missing GOOGLE_CLIENT_ID configuration.',
+      });
+    }
+
+    const client = new OAuth2Client(audience);
+    const ticket = await client.verifyIdToken({ idToken: credential, audience });
+    const payload = ticket.getPayload();
+
+    const email = (payload?.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Google account email is missing.' });
+    }
+    if (payload?.email_verified === false) {
+      return res.status(401).json({ success: false, message: 'Google email is not verified.' });
+    }
+
+    const googleSub = payload?.sub ? String(payload.sub) : '';
+    const name = payload?.name ? String(payload.name) : '';
+    const picture = payload?.picture ? String(payload.picture) : null;
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        email,
+        name,
+        authProvider: 'google',
+        googleSub,
+        googlePicture: picture,
+      });
+    } else {
+      // Link/refresh google profile info (safe even for password users).
+      const updates = {};
+      if (!user.googleSub && googleSub) updates.googleSub = googleSub;
+      if (picture && user.googlePicture !== picture) updates.googlePicture = picture;
+      if (!user.name && name) updates.name = name;
+      if (user.authProvider !== 'google' && googleSub) updates.authProvider = 'google';
+      if (Object.keys(updates).length) {
+        await User.updateOne({ _id: user._id }, { $set: updates });
+        user = await User.findById(user._id);
+      }
+    }
+
+    if (user.accountStatus === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been suspended. Contact support if you believe this is a mistake.',
+      });
+    }
+
+    const token = signToken(user._id);
+    const safe = user.toObject();
+    delete safe.passwordHash;
+    delete safe.otpCode;
+    delete safe.otpExpiresAt;
+    delete safe.passwordResetOtp;
+    delete safe.passwordResetOtpExpiresAt;
+
+    return res.json({
+      success: true,
+      token,
+      user: safe,
+    });
+  } catch (err) {
+    console.error('googleAuth error:', err);
+    return res.status(401).json({ success: false, message: 'Google authentication failed.' });
   }
 }

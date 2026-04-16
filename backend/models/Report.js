@@ -14,6 +14,15 @@ const reportSchema = new mongoose.Schema(
     },
     description: { type: String, default: '' },
     status: { type: String, enum: ['open', 'resolved', 'dismissed'], default: 'open' },
+    /** Last admin resolution (warn / block user / delete user / dismiss). */
+    adminAction: {
+      type: String,
+      enum: ['none', 'warned', 'blocked', 'deleted', 'dismissed'],
+      default: 'none',
+    },
+    adminNote: { type: String, default: '' },
+    handledAt: { type: Date, default: null },
+    handledByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   },
   { timestamps: true }
 );

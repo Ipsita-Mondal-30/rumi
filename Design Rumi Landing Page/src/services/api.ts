@@ -65,6 +65,10 @@ export async function login(data: any) {
   return api.post('/auth/login', data, { skipAuth: true } as { skipAuth: boolean });
 }
 
+export async function googleLogin(data: { credential: string }) {
+  return api.post('/auth/google', data, { skipAuth: true } as { skipAuth: boolean });
+}
+
 export async function sendOtp(data: any) {
   return api.post('/auth/otp/send', data, { skipAuth: true } as { skipAuth: boolean });
 }

@@ -62,7 +62,11 @@
         '/api': {
           target: 'http://localhost:4000',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
+          rewrite: (path) => {
+            // Admin routes live on the backend under `/api/admin/*`; other `/api/*` proxies strip the prefix.
+            if (path.startsWith('/api/admin')) return path;
+            return path.replace(/^\/api/, '');
+          },
         },
       },
     },
