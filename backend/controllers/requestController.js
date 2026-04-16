@@ -3,6 +3,23 @@ import { User } from '../models/User.js';
 import { calculateMatch } from '../services/matchingService.js';
 import { Room } from '../models/Room.js';
 import { calculateRoomCompatibility } from '../services/roomMatchingService.js';
+import { Notification } from '../models/Notification.js';
+
+async function createNotification(userId, type, title, message, meta = {}) {
+  try {
+    await Notification.create({
+      userId,
+      type,
+      title,
+      message,
+      read: false,
+      meta,
+    });
+  } catch (e) {
+    // Do not fail the main flow if notifications fail.
+    console.error('createNotification error:', e);
+  }
+}
 
 /**
  * POST /request/send
@@ -58,6 +75,15 @@ export async function sendRequest(req, res) {
       { new: true, upsert: true }
     ).populate('toUserId', 'name age city photo profilePicture');
 
+    // Notify recipient (simple in-app notification).
+    await createNotification(
+      toUserId,
+      'request_received',
+      'New user received',
+      'You have a new connection request.',
+      { fromUserId: fromUserId.toString(), roomId: roomIdStr || null, requestId: doc?._id?.toString?.() }
+    );
+
     // Auto-match: if the other user already liked you (pending reverse request),
     // mark both directions as accepted.
     const reversePending = await Request.findOne({
@@ -78,6 +104,24 @@ export async function sendRequest(req, res) {
           { fromUserId: toUserId, toUserId: fromUserId, roomId: roomIdStr || null },
           { $set: { status: 'accepted', respondedAt: new Date() } },
           { new: true }
+        ),
+      ]);
+
+      // Notify both sides that the request was accepted (auto-match).
+      await Promise.all([
+        createNotification(
+          fromUserId,
+          'request_accepted',
+          'Your request was accepted',
+          "It's a match — you can start chatting now.",
+          { withUserId: toUserId.toString(), roomId: roomIdStr || null }
+        ),
+        createNotification(
+          toUserId,
+          'request_accepted',
+          'Your request was accepted',
+          "It's a match — you can start chatting now.",
+          { withUserId: fromUserId.toString(), roomId: roomIdStr || null }
         ),
       ]);
 
@@ -181,6 +225,16 @@ export async function acceptRequest(req, res) {
     if (!doc) {
       return res.status(404).json({ success: false, message: 'Request not found.' });
     }
+
+    // Notify sender that their request was accepted.
+    await createNotification(
+      doc.fromUserId?._id || fromUserId,
+      'request_accepted',
+      'Your request was accepted',
+      'You can now open Messages and start chatting.',
+      { toUserId: toUserId.toString(), roomId: doc.roomId ? String(doc.roomId) : null, requestId: doc._id.toString() }
+    );
+
     return res.json({
       success: true,
       message: 'Request accepted.',

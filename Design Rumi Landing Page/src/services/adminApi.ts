@@ -1,9 +1,16 @@
 import axios from 'axios';
 import { API_BASE_URL } from './api';
 
+/** Resolves to `.../api` whether `API_BASE_URL` is `http://host:4000` or same-origin `/api`. */
+function adminApiRoot() {
+  const base = String(API_BASE_URL).replace(/\/$/, '');
+  if (base.endsWith('/api')) return base;
+  return `${base}/api`;
+}
+
 /** Axios instance for admin panel — uses `rumi_admin_token`, not user `rumi_token`. */
 export const adminHttp = axios.create({
-  baseURL: `${String(API_BASE_URL).replace(/\/$/, '')}/api`,
+  baseURL: adminApiRoot(),
   headers: { 'Content-Type': 'application/json' },
 });
 

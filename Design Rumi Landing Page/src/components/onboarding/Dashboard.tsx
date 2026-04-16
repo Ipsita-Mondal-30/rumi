@@ -49,12 +49,17 @@ import {
   getChatHistory,
   getProfile,
   getRecommendedRooms,
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
 } from '../../services/api';
 import { API_BASE_URL } from '../../services/api';
 import { getChatSocket } from '../../services/chatSocket';
 import { RecommendedRoomsSection } from '../explore/RecommendedRoomsSection';
 import { RoomDetailsModal } from '../explore/RoomDetailsModal';
 import { OfferRoomDashboard } from '../offer/OfferRoomDashboard';
+import { UserAvatar } from '../common/UserAvatar';
+import { UserPhoto } from '../common/UserPhoto';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -149,6 +154,9 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   );
 
   const [avatarSrc, setAvatarSrc] = useState('');
+  const [notifications, setNotifications] = useState([] as any[]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [isExploreLocked, setIsExploreLocked] = useState(false);
   const [recommendedRooms, setRecommendedRooms] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
@@ -171,6 +179,11 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
     if (str.startsWith('http://') || str.startsWith('https://')) return str;
     if (str.startsWith('/')) return `${API_BASE_URL}${str}`;
     return `${API_BASE_URL}/${str}`;
+  };
+
+  const readUserId = (u: any) => {
+    const id = u?._id ?? u?.id ?? u?.userId;
+    return id ? String(id) : '';
   };
 
   const readStoredUserId = () => {
@@ -205,12 +218,8 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
   const lifestyleMatchScore = avgMatchScore;
 
   const showFindRoomSideWidgets = useMemo(() => {
-    return (
-      activeNav !== 'messages' &&
-      activeNav !== 'matches' &&
-      activeNav !== 'profile' &&
-      activeNav !== 'settings'
-    );
+    // Keep right-side widgets only for the swipe discovery view.
+    return activeNav === 'discover';
   }, [activeNav]);
 
   const selectedChatMatch = useMemo(() => {
@@ -336,17 +345,20 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
     setLoading(true);
     try {
-            const [matchesRes, receivedRes, sentRes, receivedAcceptedRes] = await Promise.all([
+      const [matchesRes, receivedRes, sentRes, receivedAcceptedRes, notifRes] = await Promise.all([
         getMatches({ limit: 20 }),
         getReceivedRequests(),
         getSentRequests(),
         getReceivedAcceptedRequests(),
+        getNotifications({ limit: 10 }),
       ]);
 
       const matches = matchesRes?.data?.matches || [];
       const received = receivedRes?.data?.requests || [];
       const sent = sentRes?.data?.requests || [];
       const receivedAccepted = receivedAcceptedRes?.data?.requests || [];
+      const notifs = notifRes?.data?.notifications || [];
+      const unreadCount = notifRes?.data?.unreadCount ?? 0;
 
       const mappedSwipe = matches.map((m: any) => {
         const u = m.user || m;
@@ -363,7 +375,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           userId: u._id,
           name: u.name,
           age: u.age ?? '',
-        image: rawImg ? normalizeImageUrl(rawImg) : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
+          image: rawImg ? normalizeImageUrl(rawImg) : '',
           match: m.matchScore ?? m.compatibility ?? 0,
           bio: u.bio || '',
           tags,
@@ -380,6 +392,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
       const mappedReceived = received.map((r: any) => {
         const u = r.fromUserId || {};
+        const uid = readUserId(u);
         const rid = r.roomId?._id || r.roomId;
         const ridStr = rid ? String(rid) : null;
         const rm = r.roomId && typeof r.roomId === 'object' ? r.roomId : null;
@@ -393,9 +406,9 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
           id: r._id,
           name: u.name,
           age: u.age ?? '',
-          image: u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+          image: u.photo || u.profilePicture ? normalizeImageUrl(u.photo || u.profilePicture) : '',
           match: r.matchScore ?? r.match ?? 0,
-          userId: u._id,
+          userId: uid,
           requestId: r._id,
           roomId: ridStr,
           roomLabel,
@@ -404,16 +417,17 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
       const mappedSent = sent.map((r: any) => {
         const u = r.toUserId || {};
+        const uid = readUserId(u);
         const rid = r.roomId?._id || r.roomId;
         const ridStr = rid ? String(rid) : null;
         return {
           id: r._id,
           name: u.name,
           age: u.age ?? '',
-          image: u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+          image: u.photo || u.profilePicture ? normalizeImageUrl(u.photo || u.profilePicture) : '',
           match: r.matchScore ?? r.match ?? 0,
           status: r.status,
-          userId: u._id,
+          userId: uid,
           requestId: r._id,
           roomId: ridStr,
         };
@@ -424,6 +438,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
 
       mappedSent
         .filter((r: any) => r.status === 'accepted')
+        .filter((r: any) => String(r.userId || '').trim())
         .forEach((r: any) => {
           const key = r.roomId ? `${r.userId}:${r.roomId}` : String(r.userId);
           activeMap.set(key, {
@@ -431,41 +446,54 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
             name: r.name,
             match: r.match,
             image: r.image,
-            userId: r.userId,
+            userId: String(r.userId),
             roomId: r.roomId,
           });
         });
 
       receivedAccepted.forEach((r: any) => {
         const u = r.fromUserId || {};
+        const uid = readUserId(u);
         const rid = r.roomId?._id || r.roomId;
         const ridStr = rid ? String(rid) : null;
-        const key = ridStr ? `${u._id}:${ridStr}` : String(u._id);
+        if (!uid) return;
+        const key = ridStr ? `${uid}:${ridStr}` : String(uid);
         activeMap.set(key, {
           id: r._id,
           name: u.name,
           match: r.matchScore ?? r.match ?? 0,
-          image: u.photo || u.profilePicture || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop',
-          userId: u._id,
+          image: u.photo || u.profilePicture ? normalizeImageUrl(u.photo || u.profilePicture) : '',
+          userId: uid,
           roomId: ridStr,
         });
       });
 
       setSwipeCards(mappedSwipe);
-      setRequestsReceived(mappedReceived);
-      setSentRequests(mappedSent);
-      setActiveMatches(Array.from(activeMap.values()));
+      setRequestsReceived(mappedReceived.filter((r: any) => String(r.userId || '').trim()));
+      setSentRequests(mappedSent.filter((r: any) => String(r.userId || '').trim()));
+      setActiveMatches(Array.from(activeMap.values()).filter((m: any) => String(m.userId || '').trim()));
+      setNotifications(notifs);
+      setUnreadNotifCount(Number(unreadCount) || 0);
     } catch (e) {
       // Keep UI stable; just show empty cards.
       setSwipeCards([]);
       setRequestsReceived([]);
       setSentRequests([]);
       setActiveMatches([]);
+      setNotifications([]);
+      setUnreadNotifCount(0);
       // eslint-disable-next-line no-console
       console.error('reloadDashboard error', e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatNotifTime = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   useEffect(() => {
@@ -901,19 +929,92 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
               </div>
               )}
 
-              {/* Icons */}
-              <button className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors relative">
-                <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              {/* Notifications */}
+              <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors relative">
+                    <Bell size={20} />
+                    {unreadNotifCount > 0 ? (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                        {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                      </span>
+                    ) : null}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-[360px] bg-white text-gray-900 border border-gray-200 rounded-xl shadow-lg p-2 z-[120]"
+                >
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await markAllNotificationsRead();
+                          await reloadDashboard();
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+                  <div className="max-h-[340px] overflow-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-8 text-center">
+                        <p className="text-sm text-gray-600 font-medium">No notifications</p>
+                        <p className="text-xs text-gray-500 mt-1">Requests and acceptances will appear here.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {notifications.map((n: any) => (
+                          <button
+                            key={String(n._id)}
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                if (!n.read) await markNotificationRead(String(n._id));
+                                await reloadDashboard();
+                              } catch {
+                                // ignore
+                              } finally {
+                                setNotifOpen(false);
+                              }
+                              // Gentle navigation: new request -> discover, accepted -> messages
+                              if (n.type === 'request_received') setActiveNav('discover');
+                              else if (n.type === 'request_accepted') setActiveNav('messages');
+                            }}
+                            className={`w-full text-left px-3 py-3 hover:bg-gray-50 rounded-lg transition-colors ${
+                              n.read ? '' : 'bg-blue-50/40'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{n.title}</p>
+                                <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{n.message}</p>
+                              </div>
+                              <span className="text-[11px] text-gray-400 flex-shrink-0 tabular-nums">
+                                {formatNotifTime(n.createdAt)}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="w-10 h-10 rounded-full overflow-hidden focus:outline-none">
-                    <img
-                      src={avatarSrc || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80"}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
+                    <UserAvatar
+                      name={profileUser?.name || userEmail || 'Admin'}
+                      src={avatarSrc || null}
+                      className="w-10 h-10 rounded-full"
                     />
                   </button>
                 </DropdownMenuTrigger>
@@ -1043,9 +1144,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                         chatWithUserId &&
                         String(chatWithUserId) === otherId &&
                         String(chatRoomId || '') === String(match.roomId || '');
-                      const imgSrc = match.image
-                        ? normalizeImageUrl(match.image)
-                        : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop';
+                      const imgSrc = match.image ? normalizeImageUrl(match.image) : '';
                       const meta = inboxPreviews[rowKey];
                       return (
                         <button
@@ -1059,10 +1158,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                             isActive ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
                           }`}
                         >
-                          <img
-                            src={imgSrc}
-                            alt=""
-                            className="w-12 h-12 rounded-full object-cover bg-gray-100 flex-shrink-0 ring-1 ring-gray-100"
+                          <UserAvatar
+                            name={match.name}
+                            src={imgSrc || null}
+                            className="w-12 h-12 flex-shrink-0 ring-1 ring-gray-100"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline justify-between gap-2">
@@ -1131,14 +1230,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                       >
                         <ChevronLeft size={22} />
                       </button>
-                      <img
-                        src={
-                          selectedChatMatch?.image
-                            ? normalizeImageUrl(selectedChatMatch.image)
-                            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
-                        }
-                        alt=""
-                        className="w-10 h-10 rounded-full object-cover ring-1 ring-gray-100"
+                      <UserAvatar
+                        name={selectedChatMatch?.name}
+                        src={selectedChatMatch?.image ? normalizeImageUrl(selectedChatMatch.image) : null}
+                        className="w-10 h-10 ring-1 ring-gray-100"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 truncate text-[15px]">
@@ -1238,9 +1333,7 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {(filteredChatMatches as any[]).map((m) => {
-                        const imgSrc = m.image
-                          ? normalizeImageUrl(m.image)
-                          : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop';
+                        const imgSrc = m.image ? normalizeImageUrl(m.image) : '';
                         const key = `${m.userId}-${m.roomId || 'explore'}`;
                         const meta = inboxPreviews[key];
                         return (
@@ -1249,10 +1342,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                             className="border border-gray-100 rounded-2xl bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
                           >
                             <div className="flex items-start gap-3">
-                              <img
-                                src={imgSrc}
-                                alt=""
-                                className="w-12 h-12 rounded-full object-cover bg-gray-100 ring-1 ring-gray-100 flex-shrink-0"
+                              <UserAvatar
+                                name={m.name}
+                                src={imgSrc || null}
+                                className="w-12 h-12 ring-1 ring-gray-100 flex-shrink-0"
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
@@ -1316,13 +1409,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                       <div className="text-sm text-gray-500">Loading profile…</div>
                     ) : (
                       <div className="flex items-start gap-4">
-                        <img
-                          src={
-                            avatarSrc ||
-                            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80'
-                          }
-                          alt=""
-                          className="w-16 h-16 rounded-2xl object-cover bg-gray-100 ring-1 ring-gray-100"
+                        <UserAvatar
+                          name={profileUser?.name || userEmail || 'You'}
+                          src={avatarSrc || null}
+                          className="w-16 h-16 rounded-2xl ring-1 ring-gray-100"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-lg font-semibold text-gray-900 truncate">
@@ -1478,6 +1568,317 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   </div>
                 </div>
               </div>
+            ) : activeNav === 'dashboard' ? (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                  <div className="bg-gradient-to-r from-[#081A35] to-[#4E668A] rounded-3xl p-8 shadow-sm text-white overflow-hidden relative">
+                    <div className="absolute -top-16 -right-24 w-72 h-72 bg-white/10 rounded-full blur-2xl" />
+                    <div className="relative">
+                      <p className="text-white/80 text-sm">Welcome back</p>
+                      <h2 className="text-2xl md:text-3xl font-semibold mt-1 tracking-tight">
+                        Your roommate journey at a glance
+                      </h2>
+                      <p className="text-white/80 mt-2 max-w-xl text-sm leading-relaxed">
+                        Check new requests, open chats, and continue discovering better matches — all from one place.
+                      </p>
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav('discover')}
+                          className="px-5 py-2.5 rounded-xl bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors"
+                        >
+                          Discover matches
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav('messages')}
+                          className="px-5 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 transition-colors"
+                        >
+                          Open messages
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Discoverable profiles</p>
+                          <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                            {filteredSwipeCards.length}
+                          </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                          <Search size={20} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Requests received</p>
+                          <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                            {(requestsReceived as any[]).length}
+                          </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                          <Heart size={20} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Active matches</p>
+                          <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                            {(activeMatches as any[]).length}
+                          </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Users size={20} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Avg match score</p>
+                          <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                            {avgMatchScore}%
+                          </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <Sparkles size={20} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Recommended rooms</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Suggestions based on your profile and activity.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDashboardSearch('')}
+                        className="text-xs font-semibold px-3 py-2 rounded-xl bg-gray-50 text-gray-700 border border-gray-100 hover:bg-gray-100"
+                      >
+                        Clear search
+                      </button>
+                    </div>
+                    <div className="mt-6">
+                      <RecommendedRoomsSection
+                        rooms={filteredRecommendedRooms}
+                        loading={roomsLoading}
+                        title=""
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Heart size={18} className="text-blue-600" />
+                      Requests Received
+                    </h3>
+                    {(requestsReceived as any[]).length === 0 ? (
+                      <p className="text-sm text-gray-500">No new requests right now.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {(requestsReceived as any[]).slice(0, 3).map((request: any) => (
+                          <div key={request.id} className="flex items-center gap-3">
+                            <UserAvatar
+                              name={request.name}
+                              src={request.image ? normalizeImageUrl(request.image) : null}
+                              className="w-10 h-10"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">
+                                {request.name}, {request.age}
+                              </p>
+                              <p className="text-xs text-emerald-600 font-medium">{request.match}% match</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveNav('discover')}
+                              className="text-xs font-semibold px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              Review
+                            </button>
+                          </div>
+                        ))}
+                        {(requestsReceived as any[]).length > 3 ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveNav('discover')}
+                            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100"
+                          >
+                            View all
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <MessageCircle size={18} className="text-blue-600" />
+                      Messages
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('messages')}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-800 flex items-center justify-between"
+                    >
+                      Open inbox
+                      <ChevronLeft className="rotate-180" size={18} />
+                    </button>
+                    <p className="text-xs text-gray-500 mt-3">
+                      Chat opens only after a request is accepted.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Target size={18} className="text-blue-600" />
+                      Compatibility snapshot
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-blue-50 text-center">
+                        <p className="text-2xl font-bold text-blue-600 tabular-nums">{nearbyMatchesCount}</p>
+                        <p className="text-xs text-gray-600">Nearby matches</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-emerald-50 text-center">
+                        <p className="text-2xl font-bold text-emerald-600 tabular-nums">{lifestyleMatchScore}%</p>
+                        <p className="text-xs text-gray-600">Lifestyle score</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('activity')}
+                      className="mt-4 w-full text-xs font-semibold px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100"
+                    >
+                      View activity & stats
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : activeNav === 'activity' ? (
+              <div className="max-w-5xl space-y-6">
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-gray-900">Activity & Stats</h2>
+                      <p className="text-gray-500 mt-2 text-sm">
+                        A quick view of your matching momentum and connection health.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('dashboard')}
+                      className="px-4 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-800"
+                    >
+                      Back to dashboard
+                    </button>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="rounded-2xl border border-gray-100 p-5 bg-white">
+                      <p className="text-xs text-gray-500 font-medium">Requests received</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2 tabular-nums">
+                        {(requestsReceived as any[]).length}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">People who want to connect</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 p-5 bg-white">
+                      <p className="text-xs text-gray-500 font-medium">Sent requests</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2 tabular-nums">
+                        {(sentRequests as any[]).length}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">Your outgoing interest</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 p-5 bg-white">
+                      <p className="text-xs text-gray-500 font-medium">Active matches</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2 tabular-nums">
+                        {(activeMatches as any[]).length}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">Accepted connections</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <Target size={18} className="text-blue-600" />
+                        Compatibility Insights
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Based on the current set of discoverable profiles.
+                      </p>
+                      <div className="mt-6 grid grid-cols-2 gap-3">
+                        <div className="text-center p-4 bg-white rounded-xl border border-gray-100">
+                          <p className="text-2xl font-bold text-blue-600 tabular-nums">{nearbyMatchesCount}</p>
+                          <p className="text-xs text-gray-600 mt-1">Nearby matches</p>
+                        </div>
+                        <div className="text-center p-4 bg-white rounded-xl border border-gray-100">
+                          <p className="text-2xl font-bold text-emerald-600 tabular-nums">{avgMatchScore}%</p>
+                          <p className="text-xs text-gray-600 mt-1">Avg match score</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav('discover')}
+                        className="mt-5 w-full px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                      >
+                        Continue discovering
+                      </button>
+                    </div>
+
+                    <div className="bg-white border border-gray-100 rounded-2xl p-6">
+                      <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Clock size={18} className="text-blue-600" />
+                        Recent signals
+                      </h3>
+                      <div className="space-y-3 text-sm text-gray-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-gray-600">Latest match score average</span>
+                          <span className="font-semibold tabular-nums">{avgMatchScore}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-gray-600">New requests waiting</span>
+                          <span className="font-semibold tabular-nums">{(requestsReceived as any[]).length}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-gray-600">Conversations available</span>
+                          <span className="font-semibold tabular-nums">{(activeMatches as any[]).length}</span>
+                        </div>
+                      </div>
+                      <div className="mt-6 grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav('matches')}
+                          className="px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-800"
+                        >
+                          View matches
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav('messages')}
+                          className="px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-800"
+                        >
+                          Open chats
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Column - Discover Matches (2/3 width) */}
@@ -1535,9 +1936,9 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                                 <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
                                   {/* Profile Image */}
                                   <div className="relative h-80">
-                                    <img
-                                      src={card.image}
-                                      alt={card.name}
+                                    <UserPhoto
+                                      name={card.name}
+                                      src={card.image || null}
                                       className="w-full h-full object-cover"
                                     />
                                     {/* Match Badge */}
@@ -1674,10 +2075,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                   {requestsReceived.map((request) => (
                     <div key={request.id} className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={request.image}
-                          alt={request.name}
-                          className="w-12 h-12 rounded-full object-cover"
+                        <UserAvatar
+                          name={request.name}
+                          src={request.image ? normalizeImageUrl(request.image) : null}
+                          className="w-12 h-12"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm">
@@ -1739,10 +2140,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                 <div className="space-y-3">
                   {sentRequests.map((request) => (
                     <div key={request.id} className="flex items-center gap-3">
-                      <img
-                        src={request.image}
-                        alt={request.name}
-                        className="w-10 h-10 rounded-full object-cover"
+                      <UserAvatar
+                        name={request.name}
+                        src={request.image ? normalizeImageUrl(request.image) : null}
+                        className="w-10 h-10"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">
@@ -1777,10 +2178,10 @@ export const Dashboard = ({ onLogout, userEmail, onEditProfile }: DashboardProps
                       key={`${match.userId}-${match.roomId || 'explore'}`}
                       className="flex items-center gap-3"
                     >
-                      <img
-                        src={match.image}
-                        alt={match.name}
-                        className="w-10 h-10 rounded-full object-cover"
+                      <UserAvatar
+                        name={match.name}
+                        src={match.image ? normalizeImageUrl(match.image) : null}
+                        className="w-10 h-10"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">

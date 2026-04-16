@@ -56,6 +56,19 @@ export async function rejectRequest(data: any) {
   return api.post('/request/reject', data);
 }
 
+// Notifications (simple, DB-backed; no realtime)
+export async function getNotifications(params?: { unreadOnly?: boolean; limit?: number; page?: number }) {
+  return api.get('/notification', { params: params || {} });
+}
+
+export async function markNotificationRead(id: string) {
+  return api.patch(`/notification/${id}/read`, {});
+}
+
+export async function markAllNotificationsRead() {
+  return api.patch('/notification/read-all', {});
+}
+
 // Auth — skipAuth avoids sending a stale Bearer token (can break reset/login on some setups)
 export async function register(data: any) {
   return api.post('/auth/register', data, { skipAuth: true } as { skipAuth: boolean });

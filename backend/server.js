@@ -17,6 +17,7 @@ import assistantRoutes from './routes/assistantRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
 import adminApiRoutes from './routes/adminApiRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // `.env` is expected to be inside this folder (`backend/.env`).
@@ -40,6 +41,7 @@ app.use('/chat', chatRoutes);
 app.use('/assistant', assistantRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/report', reportRoutes);
+app.use('/notification', notificationRoutes);
 app.use('/api', adminApiRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
